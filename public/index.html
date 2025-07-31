@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Finance Tracker - Enhanced</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-auth-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-firestore-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    
+    <link rel="stylesheet" href="style.css">
+    <script defer src="app.js"></script>
+
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="authScreen" class="min-h-screen flex items-center justify-center">
+        <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+            <h1 class="text-2xl font-bold text-center mb-6 text-gray-800">Personal Finance Tracker</h1>
+            <div id="authForm">
+                <input type="email" id="email" placeholder="Email" class="w-full p-3 border rounded-lg mb-4">
+                <input type="password" id="password" placeholder="Password" class="w-full p-3 border rounded-lg mb-4">
+                <button id="loginBtn" class="w-full bg-blue-600 text-white p-3 rounded-lg mb-2 hover:bg-blue-700">Sign In</button>
+                <button id="registerBtn" class="w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700">Register</button>
+            </div>
+            <div id="authError" class="text-red-500 text-sm mt-4 hidden"></div>
+        </div>
+    </div>
+
+    <div id="mainApp" class="hidden">
+        <header class="bg-white shadow-md">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center py-4">
+                    <h1 class="text-2xl font-bold text-gray-900">Finance Tracker</h1>
+                    <div class="flex items-center space-x-4">
+                        <span id="userEmail" class="text-gray-600"></span>
+                        <button id="exportBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Export</button>
+                        <button id="logoutBtn" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">Logout</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <nav class="bg-blue-600 shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex space-x-8">
+                    <button class="nav-btn text-white px-3 py-4 font-medium border-b-2 border-blue-600" data-tab="dashboard">Dashboard</button>
+                    <button class="nav-btn text-blue-200 px-3 py-4 font-medium hover:text-white" data-tab="accounts">Accounts</button>
+                    <button class="nav-btn text-blue-200 px-3 py-4 font-medium hover:text-white" data-tab="transactions">Transactions</button>
+                    <button class="nav-btn text-blue-200 px-3 py-4 font-medium hover:text-white" data-tab="import">Import Data</button>
+                    <button class="nav-btn text-blue-200 px-3 py-4 font-medium hover:text-white" data-tab="investments">Investments</button>
+                    <button class="nav-btn text-blue-200 px-3 py-4 font-medium hover:text-white" data-tab="analytics">Analytics</button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div id="dashboard" class="tab-content">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-sm font-medium text-gray-500">Total Income (This Month)</h3>
+                        <p id="totalIncome" class="text-2xl font-bold text-green-600">$0.00</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-sm font-medium text-gray-500">Total Expenses (This Month)</h3>
+                        <p id="totalExpenses" class="text-2xl font-bold text-red-600">$0.00</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-sm font-medium text-gray-500">Net Savings (This Month)</h3>
+                        <p id="netSavings" class="text-2xl font-bold text-blue-600">$0.00</p>
+                    </div>
+                    <div class="baseline-card text-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-sm font-medium opacity-90">Total Net Worth</h3>
+                        <p id="totalNetWorth" class="text-2xl font-bold">$0.00</p>
+                        <div class="text-xs opacity-75 mt-1">
+                            Baseline: <span id="baselineDisplay">$0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-gradient-to-r from-green-400 to-green-600 text-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-sm font-medium opacity-90">Real Estate Net</h3>
+                        <p id="realEstateNet" class="text-2xl font-bold">$0.00</p>
+                    </div>
+                    <div class="bg-gradient-to-r from-blue-400 to-blue-600 text-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-sm font-medium opacity-90">Business Net</h3>
+                        <p id="businessNet" class="text-2xl font-bold">$0.00</p>
+                    </div>
+                    <div class="lisa-income-card text-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-sm font-medium opacity-90">Lisa's Monthly Income</h3>
+                        <p id="lisaIncome" class="text-2xl font-bold">$0.00</p>
+                        <div class="text-xs opacity-75 mt-1">From rent distributions</div>
+                    </div>
+                    <div class="investment-card text-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-sm font-medium opacity-90">Investment Contributions</h3>
+                        <p id="totalInvestmentContributions" class="text-2xl font-bold">$0.00</p>
+                        <div class="text-xs opacity-75 mt-1">
+                            Business: <span id="businessContributions">$0</span> | Direct: <span id="directContributions">$0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gradient-to-r from-orange-400 to-orange-600 text-white p-6 rounded-lg shadow-md mb-8">
+                    <h3 class="text-lg font-semibold opacity-90">Monthly Goal Progress</h3>
+                    <div class="flex justify-between items-center mt-2">
+                        <span class="text-2xl font-bold">$17,932 Target</span>
+                        <span id="combinedNet" class="text-2xl font-bold">$0.00</span>
+                    </div>
+                    <div class="w-full bg-orange-500 rounded-full h-3 mt-3">
+                        <div id="goalProgress" class="bg-white h-3 rounded-full progress-bar" style="width: 0%"></div>
+                    </div>
+                    <div class="text-sm opacity-75 mt-2">
+                        <span id="goalPercentage">0%</span> of monthly goal achieved
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h2 class="text-lg font-semibold text-gray-900">Recent Transactions</h2>
+                    </div>
+                    <div id="recentTransactions" class="p-6">
+                        </div>
+                </div>
+            </div>
+
+            <div id="accounts" class="tab-content hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900">Accounts</h2>
+                    <div class="flex space-x-2">
+                        <button id="setBaselineBtn" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">Set Baseline Net Worth</button>
+                        <button id="refreshDataBtn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">Refresh</button>
+                        <button id="addAccountBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Add Account</button>
+                        <button id="quickSetupBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Quick Setup</button>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="accountsList" class="bg-white divide-y divide-gray-200">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="investments" class="tab-content hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900">Investment Tracking</h2>
+                    <div class="flex space-x-2">
+                        <button id="uploadSchwabBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Upload Schwab Statement</button>
+                        <button id="refreshInvestmentsBtn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">Refresh</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-sm font-medium text-gray-500">Current Investment Value</h3>
+                        <p id="currentInvestmentValue" class="text-2xl font-bold text-blue-600">$0.00</p>
+                        <div class="text-xs text-gray-500 mt-1">Last updated: <span id="lastUpdateDate">Never</span></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-sm font-medium text-gray-500">This Month's Contributions</h3>
+                        <p id="monthlyContributions" class="text-2xl font-bold text-green-600">$0.00</p>
+                        <div class="text-xs text-gray-500 mt-1">Business + Direct deposits</div>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-sm font-medium text-gray-500">YTD Contributions</h3>
+                        <p id="ytdContributions" class="text-2xl font-bold text-purple-600">$0.00</p>
+                        <div class="text-xs text-gray-500 mt-1">Total invested this year</div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h3 class="text-lg font-semibold mb-4">Upload Schwab PDF Statement</h3>
+                    <div id="pdfDropZone" class="pdf-drop-zone border-2 rounded-lg p-8 text-center">
+                        <p class="text-lg text-gray-600 mb-2">Drop Schwab PDF statement here or click to upload</p>
+                        <input type="file" id="pdfFileInput" accept=".pdf" class="hidden">
+                        <button id="pdfUploadBtn" class="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">Select PDF File</button>
+                    </div>
+                    <div id="pdfProcessingStatus" class="mt-4 hidden">
+                        <div class="text-sm text-gray-600">Processing PDF...</div>
+                        <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
+                            <div id="pdfProgress" class="bg-blue-600 h-2 rounded-full progress-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-semibold mb-4">Investment History</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value/Contribution</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                                </tr>
+                            </thead>
+                            <tbody id="investmentHistoryTable" class="bg-white divide-y divide-gray-200">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="import" class="tab-content hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900">Import CSV Data</h2>
+                    <div class="flex space-x-2">
+                        <button id="clearImportBtn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">Clear</button>
+                        <button id="validateImportBtn" class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700" disabled>Validate</button>
+                        <button id="processImportBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50" disabled>Import</button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h3 class="text-lg font-semibold mb-4">Upload Chase CSV Files</h3>
+                    <div id="csvDropZone" class="csv-drop-zone border-2 rounded-lg p-8 text-center">
+                        <p class="text-lg text-gray-600 mb-2">Drop Chase CSV files here or click to upload</p>
+                        <input type="file" id="csvFileInput" multiple accept=".csv" class="hidden">
+                        <button id="csvUploadBtn" class="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">Select Files</button>
+                    </div>
+                </div>
+
+                <div id="importProgress" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+                    <h3 class="text-lg font-semibold mb-4">Import Progress</h3>
+                    <div class="space-y-4">
+                        <div class="flex justify-between text-sm">
+                            <span>Processing files...</span>
+                            <span id="progressText">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div id="progressBar" class="bg-blue-600 h-2 rounded-full progress-bar" style="width: 0%"></div>
+                        </div>
+                        <div id="progressLog" class="text-sm text-gray-600 max-h-32 overflow-y-auto">
+                            </div>
+                    </div>
+                </div>
+
+                <div id="importPreview" class="bg-white rounded-lg shadow-md p-6 hidden">
+                    <h3 class="text-lg font-semibold mb-4">Import Preview</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="previewTableBody" class="bg-white divide-y divide-gray-200">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="transactions" class="tab-content hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900">Transactions</h2>
+                    <button id="addTransactionBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Add Transaction</button>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <div class="flex space-x-4">
+                            <select id="filterAccount" class="border rounded-lg px-3 py-2">
+                                <option value="">All Accounts</option>
+                            </select>
+                            <select id="filterType" class="border rounded-lg px-3 py-2">
+                                <option value="">All Types</option>
+                                <option value="Income">Income</option>
+                                <option value="Expense">Expense</option>
+                                <option value="Transfer">Transfer</option>
+                            </select>
+                            <select id="filterCategory" class="border rounded-lg px-3 py-2">
+                                <option value="">All Categories</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="transactionsList" class="divide-y divide-gray-200 max-h-96 overflow-y-auto">
+                        </div>
+                </div>
+            </div>
+
+            <div id="analytics" class="tab-content hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900">Account Analysis</h2>
+                    <div class="flex space-x-2">
+                        <select id="analyticsAccount" class="border rounded-lg px-3 py-2">
+                            <option value="">All Accounts</option>
+                        </select>
+                        <button id="refreshAnalyticsBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Analyze</button>
+                    </div>
+                </div>
+
+                <div id="accountAnalysis" class="space-y-6">
+                    <p class="text-gray-500 text-center">Click "Analyze" to see transaction patterns</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="baselineModal" class="hidden fixed inset-0 modal-overlay z-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900">Set Baseline Net Worth</h3>
+            </div>
+            <div class="px-6 py-4">
+                <form id="baselineForm">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Baseline Net Worth Amount</label>
+                        <input type="number" id="baselineAmount" step="0.01" class="w-full border rounded-lg px-3 py-2" placeholder="Enter baseline amount" required>
+                        <div class="text-sm text-gray-500 mt-1">This includes assets not tracked in accounts (real estate, other investments, etc.)</div>
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Description (Optional)</label>
+                        <input type="text" id="baselineDescription" class="w-full border rounded-lg px-3 py-2" placeholder="e.g., Real estate + external investments">
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" id="cancelBaseline" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+                        <button type="submit" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">Set Baseline</button>
+                    </div>
+                </form>
+            </div>

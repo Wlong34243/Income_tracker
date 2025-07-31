@@ -1,0 +1,24 @@
+.modal-overlay {
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+}
+.progress-bar {
+    transition: width 0.3s ease;
+}
+.csv-drop-zone, .pdf-drop-zone {
+    border: 2px dashed #d1d5db;
+    transition: all 0.3s ease;
+}
+.csv-drop-zone.dragover, .pdf-drop-zone.dragover {
+    border-color: #3b82f6;
+    background-color: #eff6ff;
+}
+.baseline-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+.lisa-income-card {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+.investment-card {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
