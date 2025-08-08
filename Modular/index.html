@@ -148,6 +148,7 @@
         import { AppConfig } from './js/config/AppConfig.js';
         import { AuthService } from './js/auth/AuthService.js';
         import { DataService } from './js/data/DataService.js';
+        import { GeminiService } from './js/ai/GeminiService.js';
         import { EnhancedCSVImporter } from './js/import/EnhancedCSVImporter.js'; 
         import { AnalyticsEngine } from './js/analytics/AnalyticsEngine.js';
         import { Dashboard } from './js/ui/Dashboard.js';
@@ -165,9 +166,10 @@
                 // Initialize core services
                 this.authService = new AuthService();
                 this.dataService = new DataService(this.authService);
+                this.geminiService = new GeminiService();
                 
                 // IMPORTANT: Pass dataService to EnhancedCSVImporter
-                this.csvImporter = new EnhancedCSVImporter(this.dataService);
+                this.csvImporter = new EnhancedCSVImporter(this.dataService, this.geminiService);
                 
                 // Initialize other services
                 this.analytics = new AnalyticsEngine(this.dataService);

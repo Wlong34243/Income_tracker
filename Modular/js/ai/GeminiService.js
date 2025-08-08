@@ -309,8 +309,5 @@ Respond with ONLY a JSON object (no markdown, no explanation) with these exact f
     }
 }
 
-// Create and export singleton instance
-export const geminiService = new GeminiService();
-
-// Also export the class for testing
+// Export the class for instantiation, no singleton
 export { GeminiService };

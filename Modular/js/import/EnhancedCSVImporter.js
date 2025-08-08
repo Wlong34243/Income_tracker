@@ -3,18 +3,22 @@
 import { AppConfig } from '../config/AppConfig.js';
 import { DataService } from '../data/DataService.js';
 import { DuplicateDetector } from './DuplicateDetector.js';
-import { transactionRules } from '../rules/TransactionRules.js';
-import { geminiService } from '../ai/GeminiService.js';
+import { GeminiService } from '../ai/GeminiService.js';
 
 export class EnhancedCSVImporter {
     /**
      * @param {DataService} dataService An instance of the DataService to interact with application data.
+     * @param {GeminiService} geminiService An instance of the GeminiService for AI categorization.
      */
-    constructor(dataService) {
+    constructor(dataService, geminiService) {
         if (!dataService) {
             throw new Error("DataService instance is required.");
         }
-        this.dataService = dataService; // Store reference to the data service
+        if (!geminiService) {
+            throw new Error("GeminiService instance is required.");
+        }
+        this.dataService = dataService;
+        this.geminiService = geminiService;
         this.importResults = null;
         this.categorizedTransactions = [];
         this.duplicates = [];
@@ -253,7 +257,7 @@ export class EnhancedCSVImporter {
                 }
                 
                 // Safety check to ensure categorization is always an object
-                const categorization = await geminiService.categorizeTransaction(transaction, { skipAI: true }) || {
+                const categorization = await this.geminiService.categorizeTransaction(transaction, { skipAI: true }) || {
                     category: 'Uncategorized',
                     confidence: 0.3,
                     method: 'fallback',
@@ -370,7 +374,7 @@ export class EnhancedCSVImporter {
         
         this.showLoading(`Categorizing ${uncategorized.length} transactions with AI...`);
         try {
-            const results = await geminiService.batchCategorize(uncategorized, { skipAI: false });
+            const results = await this.geminiService.batchCategorize(uncategorized, { skipAI: false });
             results.forEach(result => {
                 const txnIndex = this.categorizedTransactions.findIndex(t => t.importId === result.transaction.importId);
                 if (txnIndex !== -1 && result.suggestion.confidence > (this.categorizedTransactions[txnIndex].confidence || 0)) {
