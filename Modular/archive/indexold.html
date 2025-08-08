@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Finance Tracker - Modular</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-auth-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-firestore-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.4.1/papaparse.min.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Authentication Screen -->
+    <div id="authScreen" class="min-h-screen flex items-center justify-center">
+        <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+            <h1 class="text-2xl font-bold text-center mb-6 text-gray-800">Personal Finance Tracker</h1>
+            <div id="authForm">
+                <input type="email" id="email" placeholder="Email" class="w-full p-3 border rounded-lg mb-4">
+                <input type="password" id="password" placeholder="Password" class="w-full p-3 border rounded-lg mb-4">
+                <button id="loginBtn" class="w-full bg-blue-600 text-white p-3 rounded-lg mb-2 hover:bg-blue-700">Sign In</button>
+                <button id="registerBtn" class="w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700">Register</button>
+            </div>
+            <div id="authError" class="text-red-500 text-sm mt-4 hidden"></div>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="mainApp" class="hidden">
+        <!-- Header -->
+        <header class="bg-white shadow-md">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center py-4">
+                    <h1 class="text-2xl font-bold text-gray-900">Finance Tracker</h1>
+                    <div class="flex items-center space-x-4">
+                        <span id="userEmail" class="text-gray-600"></span>
+                        <button id="exportBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Export</button>
+                        <button id="logoutBtn" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">Logout</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="bg-blue-600 shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex space-x-8">
+                    <button class="nav-btn text-white px-3 py-4 font-medium border-b-2 border-blue-600" data-tab="dashboard">Dashboard</button>
+                    <button class="nav-btn text-blue-200 px-3 py-4 font-medium hover:text-white" data-tab="accounts">Accounts</button>
+                    <button class="nav-btn text-blue-200 px-3 py-4 font-medium hover:text-white" data-tab="transactions">Transactions</button>
+                    <button class="nav-btn text-blue-200 px-3 py-4 font-medium hover:text-white" data-tab="import">Import Data</button>
+                    <button class="nav-btn text-blue-200 px-3 py-4 font-medium hover:text-white" data-tab="analytics">Analytics</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Tab Content Container -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-content">
+                <!-- Summary Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-sm font-medium text-gray-500">Total Income (This Month)</h3>
+                        <p id="totalIncome" class="text-2xl font-bold text-green-600">$0.00</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-sm font-medium text-gray-500">Total Expenses (This Month)</h3>
+                        <p id="totalExpenses" class="text-2xl font-bold text-red-600">$0.00</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-sm font-medium text-gray-500">Net Savings (This Month)</h3>
+                        <p id="netSavings" class="text-2xl font-bold text-blue-600">$0.00</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-sm font-medium text-gray-500">Total Net Worth</h3>
+                        <p id="totalNetWorth" class="text-2xl font-bold text-purple-600">$0.00</p>
+                    </div>
+                </div>
+
+                <!-- Business Performance Dashboard -->
+                <div class="mt-8">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Business Performance</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-gradient-to-r from-green-400 to-green-600 text-white p-4 rounded-lg">
+                            <h4 class="text-sm font-medium opacity-90">Real Estate Net</h4>
+                            <p id="realEstateNet" class="text-xl font-bold">$0.00</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-blue-400 to-blue-600 text-white p-4 rounded-lg">
+                            <h4 class="text-sm font-medium opacity-90">Tech Business Net</h4>
+                            <p id="businessNet" class="text-xl font-bold">$0.00</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-purple-400 to-purple-600 text-white p-4 rounded-lg">
+                            <h4 class="text-sm font-medium opacity-90">Combined Net</h4>
+                            <p id="combinedNet" class="text-xl font-bold">$0.00</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-orange-400 to-orange-600 text-white p-4 rounded-lg">
+                            <h4 class="text-sm font-medium opacity-90">Monthly Goal</h4>
+                            <p class="text-xl font-bold">$17,932</p>
+                            <div class="w-full bg-orange-500 rounded-full h-2 mt-2">
+                                <div id="goalProgress" class="bg-white h-2 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Transactions -->
+                <div class="mt-8 bg-white rounded-lg shadow-md">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h2 class="text-lg font-semibold text-gray-900">Recent Transactions</h2>
+                    </div>
+                    <div id="recentTransactions" class="p-6">
+                        <!-- Populated by Dashboard.js -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Other tabs will be populated by respective modules -->
+            <div id="accounts" class="tab-content hidden">
+                <h2 class="text-2xl font-bold mb-4">Accounts Management</h2>
+                <p class="text-gray-600">Account management functionality will be loaded here.</p>
+            </div>
+
+            <div id="transactions" class="tab-content hidden">
+                <h2 class="text-2xl font-bold mb-4">Transaction History</h2>
+                <p class="text-gray-600">Transaction management functionality will be loaded here.</p>
+            </div>
+
+            <div id="import" class="tab-content hidden">
+                <h2 class="text-2xl font-bold mb-4">Import Data</h2>
+                <p class="text-gray-600">CSV import functionality will be loaded here.</p>
+            </div>
+
+            <div id="analytics" class="tab-content hidden">
+                <h2 class="text-2xl font-bold mb-4">Analytics</h2>
+                <p class="text-gray-600">Advanced analytics will be loaded here.</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- Load modules in dependency order -->
+    <script type="module">
+        // Import all modules
+        import { AppConfig } from './js/config/AppConfig.js';
+        import { AuthService } from './js/auth/AuthService.js';
+        import { DataService } from './js/data/DataService.js';
+        import { CSVImporter } from './js/import/CSVImporter.js';
+        import { AnalyticsEngine } from './js/analytics/AnalyticsEngine.js';
+        import { Dashboard } from './js/ui/Dashboard.js';
+        import { Modal } from './js/ui/Modal.js';
+
+        // Initialize application
+        class FinanceTrackerApp {
+            constructor() {
+                this.authService = new AuthService();
+                this.dataService = new DataService(this.authService);
+                this.analytics = new AnalyticsEngine(this.dataService);
+                this.dashboard = new Dashboard(this.analytics);
+                this.modal = new Modal();
+                this.csvImporter = new CSVImporter(this.dataService);
+                
+                this.accounts = [];
+                this.transactions = [];
+                
+                this.initializeApp();
+            }
+            
+            initializeApp() {
+                this.setupEventListeners();
+                
+                this.authService.onAuthStateChanged((user) => {
+                    if (user) {
+                        this.currentUser = user;
+                        this.showMainApp();
+                        this.loadData();
+                    } else {
+                        this.showAuthScreen();
+                    }
+                });
+            }
+            
+            async loadData() {
+                try {
+                    this.accounts = await this.dataService.loadAccounts();
+                    this.transactions = await this.dataService.loadTransactions();
+                    await this.dashboard.updateDashboard(this.transactions, this.accounts);
+                } catch (error) {
+                    console.error('Error loading data:', error);
+                    this.modal.showNotification('Error loading data: ' + error.message, 'error');
+                }
+            }
+            
+            setupEventListeners() {
+                // Authentication
+                document.getElementById('loginBtn').addEventListener('click', () => this.handleLogin());
+                document.getElementById('registerBtn').addEventListener('click', () => this.handleRegister());
+                document.getElementById('logoutBtn').addEventListener('click', () => this.handleLogout());
+                
+                // Navigation
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => this.handleNavigation(e.target.dataset.tab));
+                });
+            }
+            
+            async handleLogin() {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                
+                try {
+                    await this.authService.signIn(email, password);
+                } catch (error) {
+                    this.showAuthError(error.message);
+                }
+            }
+            
+            async handleRegister() {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                
+                try {
+                    await this.authService.signUp(email, password);
+                } catch (error) {
+                    this.showAuthError(error.message);
+                }
+            }
+            
+            async handleLogout() {
+                await this.authService.signOut();
+            }
+            
+            handleNavigation(tab) {
+                // Update active nav button
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    btn.classList.remove('text-white', 'border-blue-600');
+                    btn.classList.add('text-blue-200');
+                });
+                
+                const activeBtn = document.querySelector(`[data-tab="${tab}"]`);
+                activeBtn.classList.remove('text-blue-200');
+                activeBtn.classList.add('text-white', 'border-b-2', 'border-blue-600');
+                
+                // Show active tab
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+                document.getElementById(tab).classList.remove('hidden');
+                
+                if (tab === 'dashboard') {
+                    this.dashboard.updateDashboard(this.transactions, this.accounts);
+                }
+            }
+            
+            showMainApp() {
+                document.getElementById('authScreen').classList.add('hidden');
+                document.getElementById('mainApp').classList.remove('hidden');
+                document.getElementById('userEmail').textContent = this.currentUser.email;
+            }
+            
+            showAuthScreen() {
+                document.getElementById('authScreen').classList.remove('hidden');
+                document.getElementById('mainApp').classList.add('hidden');
+            }
+            
+            showAuthError(message) {
+                const errorDiv = document.getElementById('authError');
+                errorDiv.textContent = message;
+                errorDiv.classList.remove('hidden');
+                setTimeout(() => errorDiv.classList.add('hidden'), 5000);
+            }
+        }
+        
+        // Initialize app when DOM is ready
+        window.financeApp = new FinanceTrackerApp();
+    </script>
+</body>
+</html>

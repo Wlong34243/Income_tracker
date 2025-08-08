@@ -1,0 +1,60 @@
+/* css/styles.css */
+/* Custom styles to supplement Tailwind */
+
+.modal-overlay {
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+}
+
+.progress-bar {
+    transition: width 0.3s ease;
+}
+
+.csv-drop-zone {
+    border: 2px dashed #d1d5db;
+    transition: all 0.3s ease;
+}
+
+.csv-drop-zone.dragover {
+    border-color: #3b82f6;
+    background-color: #eff6ff;
+}
+
+.tab-content {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.notification {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+}
+
+/* Business performance cards */
+.business-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.real-estate-card {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+/* Responsive design improvements */
+@media (max-width: 768px) {
+    .nav-btn {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.875rem;
+    }
+    
+    .grid {
+        grid-template-columns: 1fr;
+    }
+}

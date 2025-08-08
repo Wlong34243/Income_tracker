@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Finance Tracker - Modular</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-auth-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-firestore-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.4.1/papaparse.min.js"></script>
+    
+    <!-- Wait for Papa to load before continuing -->
+    <script>
+        window.waitForPapa = new Promise((resolve) => {
+            if (typeof Papa !== 'undefined') {
+                resolve();
+            } else {
+                const checkPapa = () => {
+                    if (typeof Papa !== 'undefined') {
+                        resolve();
+                    } else {
+                        setTimeout(checkPapa, 100);
+                    }
+                };
+                checkPapa();
+            }
+        });
+    </script>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        /* Additional styles for import functionality */
+        .csv-drop-zone.dragover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+        
+        .tab-content {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Authentication Screen -->
+    <div id="authScreen" class="min-h-screen flex items-center justify-center">
+        <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+            <h1 class="text-2xl font-bold text-center mb-6 text-gray-800">Personal Finance Tracker</h1>
+            
+            <!-- Demo Mode Notice -->
+            <div class="bg-blue-50 p-4 rounded-lg mb-4">
+                <div class="text-sm text-blue-800">
+                    <strong>Demo Mode:</strong> Enter any email/password or click "Skip Auth" to test the app
+                </div>
+            </div>
+            
+            <div id="authForm">
+                <input type="email" id="email" placeholder="Email (any email for demo)" value="demo@finance.local" class="w-full p-3 border rounded-lg mb-4">
+                <input type="password" id="password" placeholder="Password (any password for demo)" value="demo123" class="w-full p-3 border rounded-lg mb-4">
+                <button id="loginBtn" class="w-full bg-blue-600 text-white p-3 rounded-lg mb-2 hover:bg-blue-700">Sign In</button>
+                <button id="registerBtn" class="w-full bg-green-600 text-white p-3 rounded-lg mb-2 hover:bg-green-700">Register</button>
+                <button id="skipAuthBtn" class="w-full bg-gray-600 text-white p-3 rounded-lg hover:bg-gray-700">Skip Auth (Demo)</button>
+            </div>
+            <div id="authError" class="text-red-500 text-sm mt-4 hidden"></div>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="mainApp" class="hidden">
+        <!-- Header -->
+        <header class="bg-white shadow-md">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center py-4">
+                    <h1 class="text-2xl font-bold text-gray-900">Finance Tracker</h1>
+                    <div class="flex items-center space-x-4">
+                        <span id="userEmail" class="text-gray-600"></span>
+                        <button id="exportBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Export</button>
+                        <button id="logoutBtn" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">Logout</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="bg-blue-600 shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex space-x-8">
+                    <button class="nav-btn text-white px-3 py-4 font-medium border-b-2 border-blue-600" data-tab="dashboard">Dashboard</button>
+                    <button class="nav-btn text-blue-200 px-3 py-4 font-medium hover:text-white" data-tab="accounts">Accounts</button>
+                    <button class="nav-btn text-blue-200 px-3 py-4 font-medium hover:text-white" data-tab="transactions">Transactions</button>
+                    <button class="nav-btn text-blue-200 px-3 py-4 font-medium hover:text-white" data-tab="import">Import Data</button>
+                    <button class="nav-btn text-blue-200 px-3 py-4 font-medium hover:text-white" data-tab="analytics">Analytics</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Tab Content Container -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-content">
+                <!-- Summary Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-sm font-medium text-gray-500">Total Income (This Month)</h3>
+                        <p id="totalIncome" class="text-2xl font-bold text-green-600">$0.00</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-sm font-medium text-gray-500">Total Expenses (This Month)</h3>
+                        <p id="totalExpenses" class="text-2xl font-bold text-red-600">$0.00</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-sm font-medium text-gray-500">Net Savings (This Month)</h3>
+                        <p id="netSavings" class="text-2xl font-bold text-blue-600">$0.00</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-sm font-medium text-gray-500">Total Net Worth</h3>
+                        <p id="totalNetWorth" class="text-2xl font-bold text-purple-600">$0.00</p>
+                    </div>
+                </div>
+
+                <!-- Business Performance Dashboard -->
+                <div class="mt-8">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Business Performance</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-gradient-to-r from-green-400 to-green-600 text-white p-4 rounded-lg">
+                            <h4 class="text-sm font-medium opacity-90">Real Estate Net</h4>
+                            <p id="realEstateNet" class="text-xl font-bold">$0.00</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-blue-400 to-blue-600 text-white p-4 rounded-lg">
+                            <h4 class="text-sm font-medium opacity-90">Tech Business Net</h4>
+                            <p id="businessNet" class="text-xl font-bold">$0.00</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-purple-400 to-purple-600 text-white p-4 rounded-lg">
+                            <h4 class="text-sm font-medium opacity-90">Combined Net</h4>
+                            <p id="combinedNet" class="text-xl font-bold">$0.00</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-orange-400 to-orange-600 text-white p-4 rounded-lg">
+                            <h4 class="text-sm font-medium opacity-90">Monthly Goal</h4>
+                            <p class="text-xl font-bold">$17,932</p>
+                            <div class="w-full bg-orange-500 rounded-full h-2 mt-2">
+                                <div id="goalProgress" class="bg-white h-2 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Transactions -->
+                <div class="mt-8 bg-white rounded-lg shadow-md">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h2 class="text-lg font-semibold text-gray-900">Recent Transactions</h2>
+                    </div>
+                    <div id="recentTransactions" class="p-6">
+                        <!-- Populated by Dashboard.js -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Accounts Tab -->
+            <div id="accounts" class="tab-content hidden">
+                <h2 class="text-2xl font-bold mb-4">Accounts Management</h2>
+                <p class="text-gray-600">Account management functionality will be loaded here.</p>
+            </div>
+
+            <!-- Transactions Tab -->
+            <div id="transactions" class="tab-content hidden">
+                <h2 class="text-2xl font-bold mb-4">Transaction History</h2>
+                <p class="text-gray-600">Transaction management functionality will be loaded here.</p>
+            </div>
+
+            <!-- Import Data Tab -->
+            <div id="import" class="tab-content hidden">
+                <h2 class="text-2xl font-bold mb-6">Import Data</h2>
+                
+                <!-- File Upload Section -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h3 class="text-lg font-semibold mb-4">📁 Upload CSV Files</h3>
+                    
+                    <!-- Drag and Drop Zone -->
+                    <div id="csvDropZone" class="csv-drop-zone border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-4 transition-all duration-300 hover:border-blue-400 cursor-pointer">
+                        <div class="space-y-3">
+                            <div class="text-4xl">📄</div>
+                            <div class="text-lg font-medium text-gray-700">Drop CSV files here or click to browse</div>
+                            <div class="text-sm text-gray-500">Supports Chase bank CSV formats</div>
+                            <button id="csvUploadBtn" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                                Choose Files
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Hidden file input -->
+                    <input type="file" id="csvFileInput" multiple accept=".csv" class="hidden">
+                    
+                    <!-- Account Detection Info -->
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <h4 class="font-medium text-blue-800 mb-2">📋 Account Detection</h4>
+                        <div class="text-sm text-blue-700">
+                            Your system will auto-detect accounts from filenames containing:
+                            <span class="font-mono bg-blue-100 px-2 py-1 rounded ml-1">0111, 8529, 7991, 2299, 7588, 8895, 0898, 119</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Processing Status -->
+                <div id="processingStatus" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+                    <h3 class="text-lg font-semibold mb-4">⚡ Processing Files</h3>
+                    
+                    <!-- Progress Bar -->
+                    <div class="w-full bg-gray-200 rounded-full h-2 mb-4">
+                        <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    
+                    <!-- Status Text -->
+                    <div class="flex justify-between items-center mb-4">
+                        <span id="progressText" class="text-sm text-gray-600">Initializing...</span>
+                        <span id="progressPercent" class="text-sm font-medium">0%</span>
+                    </div>
+                    
+                    <!-- Files List -->
+                    <div id="filesList" class="space-y-2">
+                        <!-- File processing status will appear here -->
+                    </div>
+                </div>
+                
+                <!-- Import Results -->
+                <div id="resultsSection" class="hidden">
+                    <!-- Transaction Preview -->
+                    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold">📊 Transaction Preview</h3>
+                            <button id="confirmImportBtn" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors">
+                                Confirm Import
+                            </button>
+                        </div>
+                        
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transactionPreview" class="bg-white divide-y divide-gray-200">
+                                    <!-- Preview rows will be added here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Import Summary -->
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-lg font-semibold mb-4">📈 Import Summary</h3>
+                        <div id="importSummary" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <!-- Summary stats will be added here -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Import Log -->
+                <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">📝 Import Log</h3>
+                        <button id="clearLogBtn" class="text-sm text-gray-500 hover:text-gray-700">Clear Log</button>
+                    </div>
+                    <div id="importLog" class="bg-gray-50 p-4 rounded-lg h-40 overflow-y-auto font-mono text-sm">
+                        Ready to import CSV files...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics Tab -->
+            <div id="analytics" class="tab-content hidden">
+                <h2 class="text-2xl font-bold mb-4">Analytics</h2>
+                <p class="text-gray-600">Advanced analytics will be loaded here.</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- Load modules and initialize app -->
+    <script type="module">
+        // Wait for Papa to be available
+        await window.waitForPapa;
+        console.log('Papa loaded:', typeof Papa);
+
+        // Import all modules (simplified for basic functionality)
+        // Note: These imports will fail if modules don't exist, but the app will still work with demo data
+
+        let AppConfig, AuthService, DataService, CSVImporter, AnalyticsEngine, Dashboard, Modal;
+
+        // Try to load modules, fallback to demo implementations if they don't exist
+        try {
+            const modules = await Promise.allSettled([
+                import('./js/config/AppConfig.js'),
+                import('./js/auth/AuthService.js'),
+                import('./js/data/DataService.js'),
+                import('./js/import/CSVImporter.js'),
+                import('./js/analytics/AnalyticsEngine.js'),
+                import('./js/ui/Dashboard.js'),
+                import('./js/ui/Modal.js')
+            ]);
+
+            AppConfig = modules[0].status === 'fulfilled' ? modules[0].value.AppConfig : null;
+            AuthService = modules[1].status === 'fulfilled' ? modules[1].value.AuthService : null;
+            DataService = modules[2].status === 'fulfilled' ? modules[2].value.DataService : null;
+            CSVImporter = modules[3].status === 'fulfilled' ? modules[3].value.CSVImporter : null;
+            AnalyticsEngine = modules[4].status === 'fulfilled' ? modules[4].value.AnalyticsEngine : null;
+            Dashboard = modules[5].status === 'fulfilled' ? modules[5].value.Dashboard : null;
+            Modal = modules[6].status === 'fulfilled' ? modules[6].value.Modal : null;
+
+        } catch (error) {
+            console.log('Some modules not found, using demo implementations');
+        }
+
+        // Demo implementations for missing modules
+        class DemoCSVImporter {
+            constructor() {
+                this.progressCallback = null;
+                this.logCallback = null;
+            }
+            
+            setProgressCallback(callback) {
+                this.progressCallback = callback;
+            }
+            
+            setLogCallback(callback) {
+                this.logCallback = callback;
+            }
+            
+            async processFiles(files) {
+                this.log('🚀 Demo CSV Importer Processing...');
+                this.log(`📁 Processing ${files.length} files with Papa: ${typeof Papa}`);
+                
+                const allTransactions = [];
+                
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    this.updateProgress((i / files.length) * 50, `Reading ${file.name}...`);
+                    
+                    try {
+                        // Read the CSV file
+                        const csvText = await this.readFileAsText(file);
+                        this.log(`✅ Read ${file.name} (${csvText.length} characters)`);
+                        
+                        this.updateProgress((i / files.length) * 50 + 25, `Parsing ${file.name}...`);
+                        
+                        // Parse with Papa
+                        const parseResult = await this.parseCSV(csvText);
+                        this.log(`✅ Parsed ${parseResult.data.length} rows from ${file.name}`);
+                        
+                        // Convert to transactions
+                        const transactions = this.convertToTransactions(parseResult.data, file.name);
+                        allTransactions.push(...transactions);
+                        
+                        this.updateProgress(((i + 1) / files.length) * 100, `Completed ${file.name}`);
+                        
+                    } catch (error) {
+                        this.log(`❌ Error processing ${file.name}: ${error.message}`);
+                    }
+                }
+                
+                this.log(`✅ Processing complete! Found ${allTransactions.length} transactions`);
+                return { transactions: allTransactions, errors: [], duplicates: [] };
+            }
+            
+            readFileAsText(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = e => resolve(e.target.result);
+                    reader.onerror = () => reject(new Error('Failed to read file'));
+                    reader.readAsText(file);
+                });
+            }
+            
+            parseCSV(csvText) {
+                return new Promise((resolve, reject) => {
+                    try {
+                        Papa.parse(csvText, {
+                            header: true,
+                            skipEmptyLines: true,
+                            dynamicTyping: true,
+                            complete: resolve,
+                            error: reject
+                        });
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+            }
+            
+            convertToTransactions(rows, fileName) {
+                const transactions = [];
+                const accountInfo = this.detectAccountFromFilename(fileName);
+                
+                rows.forEach((row, index) => {
+                    try {
+                        const transaction = this.parseRow(row, accountInfo, fileName);
+                        if (transaction) {
+                            transactions.push(transaction);
+                        }
+                    } catch (error) {
+                        this.log(`⚠️ Error parsing row ${index + 1}: ${error.message}`);
+                    }
+                });
+                
+                return transactions;
+            }
+            
+            detectAccountFromFilename(filename) {
+                const accountMappings = {
+                    '0111': { name: 'Sweep Account (0111)', entity: 'Real Estate', accountNum: '0111' },
+                    '8529': { name: 'Real Estate Ops (8529)', entity: 'Real Estate', accountNum: '8529' },
+                    '7991': { name: 'Tech Auditing (7991)', entity: 'Tech Business', accountNum: '7991' },
+                    '2299': { name: 'Business Expenses (2299)', entity: 'Tech Business', accountNum: '2299' },
+                    '7588': { name: 'Shared Checking (7588)', entity: 'Personal', accountNum: '7588' },
+                    '8895': { name: 'Self-Directed Investment (8895)', entity: 'Investment', accountNum: '8895' },
+                    '0898': { name: "Lisa's Income (0898)", entity: 'Personal', accountNum: '0898' },
+                    '119': { name: 'Schwab Brokerage (119)', entity: 'Investment', accountNum: '119' }
+                };
+                
+                const lowerName = filename.toLowerCase();
+                for (const [accountNum, accountInfo] of Object.entries(accountMappings)) {
+                    if (lowerName.includes(accountNum)) {
+                        this.log(`🔍 Detected account: ${accountInfo.name}`);
+                        return accountInfo;
+                    }
+                }
+                
+                this.log(`⚠️ Could not detect account from filename: ${filename}`);
+                return { name: 'Unknown Account', entity: 'Personal', accountNum: 'unknown' };
+            }
+            
+            parseRow(row, accountInfo, fileName) {
+                // Handle common Chase CSV column names
+                const dateValue = row['Posting Date'] || row['Transaction Date'] || row['Date'] || row['posting date'] || row['transaction date'];
+                const descValue = row['Description'] || row['Details'] || row['Memo'] || row['description'];
+                const amountValue = row['Amount'] || row['Transaction Amount'] || row['amount'];
+                
+                if (!dateValue || !descValue || amountValue === undefined) {
+                    return null;
+                }
+                
+                const date = this.parseDate(dateValue);
+                if (!date) {
+                    return null;
+                }
+                
+                const amount = this.parseAmount(amountValue);
+                if (isNaN(amount) || amount === 0) {
+                    return null;
+                }
+                
+                const type = this.detectTransactionType(descValue, amount);
+                const category = this.categorizeTransaction(descValue, accountInfo.entity);
+                
+                return {
+                    date: date,
+                    description: this.cleanDescription(descValue),
+                    amount: amount,
+                    type: type,
+                    category: category,
+                    accountInfo: accountInfo,
+                    entity: accountInfo.entity,
+                    sourceFile: fileName
+                };
+            }
+            
+            parseDate(dateStr) {
+                if (!dateStr) return null;
+                
+                const date = new Date(dateStr);
+                return isNaN(date.getTime()) ? null : date;
+            }
+            
+            parseAmount(amountStr) {
+                if (typeof amountStr === 'number') return amountStr;
+                
+                const cleaned = String(amountStr).replace(/[$,\s]/g, '');
+                return parseFloat(cleaned) || 0;
+            }
+            
+            cleanDescription(description) {
+                return String(description).trim().replace(/\s+/g, ' ');
+            }
+            
+            detectTransactionType(description, amount) {
+                const desc = description.toLowerCase();
+                
+                if (desc.includes('transfer') || desc.includes('xfer')) {
+                    return 'Transfer';
+                }
+                
+                if (desc.includes('rent') || desc.includes('consulting') || desc.includes('invoice')) {
+                    return 'Income';
+                }
+                
+                return amount > 0 ? 'Income' : 'Expense';
+            }
+            
+            categorizeTransaction(description, entity) {
+                const desc = description.toLowerCase();
+                
+                if (desc.includes('rent') || desc.includes('tenant')) return 'Real Estate Income';
+                if (desc.includes('consulting') || desc.includes('audit')) return 'Tech Business Income';
+                if (desc.includes('vyve') || desc.includes('frontier') || desc.includes('netflix')) return 'Utilities';
+                if (desc.includes('insurance')) return 'Insurance';
+                if (desc.includes('hsa') || desc.includes('health')) return 'Healthcare';
+                if (desc.includes('transfer') || desc.includes('investment')) return 'Investment Transfer';
+                
+                return 'Other';
+            }
+            
+            log(message) {
+                if (this.logCallback) this.logCallback(message);
+                console.log(message);
+            }
+            
+            updateProgress(percent, message) {
+                if (this.progressCallback) this.progressCallback(percent, message);
+            }
+        }
+
+        // Initialize application
+        class FinanceTrackerApp {
+            constructor() {
+                // Use imported modules or demo implementations
+                this.authService = AuthService ? new AuthService() : this.createDemoAuth();
+                this.dataService = DataService ? new DataService(this.authService) : this.createDemoDataService();
+                this.analytics = AnalyticsEngine ? new AnalyticsEngine(this.dataService) : null;
+                this.dashboard = Dashboard ? new Dashboard(this.analytics) : null;
+                this.modal = Modal ? new Modal() : this.createDemoModal();
+                this.csvImporter = CSVImporter ? new CSVImporter(this.dataService) : new DemoCSVImporter();
+                
+                this.accounts = [];
+                this.transactions = [];
+                this.importPreviewData = [];
+                
+                this.initializeApp();
+            }
+            
+            createDemoAuth() {
+                return {
+                    onAuthStateChanged: (callback) => {
+                        // Auto-login in demo mode
+                        console.log('Demo auth: Auto-logging in...');
+                        setTimeout(() => {
+                            const demoUser = { uid: 'demo-user', email: 'demo@finance.local', displayName: 'Demo User' };
+                            callback(demoUser);
+                        }, 500);
+                    },
+                    signIn: (email, password) => {
+                        console.log('Demo auth: Sign in with', email);
+                        return Promise.resolve({ uid: 'demo-user', email: email });
+                    },
+                    signUp: (email, password) => {
+                        console.log('Demo auth: Sign up with', email);
+                        return Promise.resolve({ uid: 'demo-user', email: email });
+                    },
+                    signOut: () => {
+                        console.log('Demo auth: Signing out...');
+                        setTimeout(() => location.reload(), 100);
+                        return Promise.resolve();
+                    }
+                };
+            }
+            
+            createDemoDataService() {
+                return {
+                    loadAccounts: () => Promise.resolve([]),
+                    loadTransactions: () => Promise.resolve([]),
+                    saveTransaction: (trans) => {
+                        console.log('Demo: Saving transaction', trans);
+                        return Promise.resolve(trans);
+                    }
+                };
+            }
+            
+            createDemoModal() {
+                return {
+                    showNotification: (message, type) => {
+                        console.log(`${type.toUpperCase()}: ${message}`);
+                        // Simple notification
+                        const notification = document.createElement('div');
+                        notification.className = `fixed top-4 right-4 bg-blue-500 text-white px-6 py-3 rounded-lg shadow-lg z-50`;
+                        notification.textContent = message;
+                        document.body.appendChild(notification);
+                        setTimeout(() => document.body.removeChild(notification), 5000);
+                    }
+                };
+            }
+            
+            initializeApp() {
+                console.log('Initializing Finance Tracker App...');
+                this.setupEventListeners();
+                
+                console.log('Setting up authentication...');
+                this.authService.onAuthStateChanged((user) => {
+                    console.log('Auth state changed:', user ? user.email : 'No user');
+                    if (user) {
+                        this.currentUser = user;
+                        this.showMainApp();
+                        this.loadData();
+                    } else {
+                        this.showAuthScreen();
+                    }
+                });
+            }
+            
+            async loadData() {
+                try {
+                    this.accounts = await this.dataService.loadAccounts();
+                    this.transactions = await this.dataService.loadTransactions();
+                    if (this.dashboard) {
+                        await this.dashboard.updateDashboard(this.transactions, this.accounts);
+                    }
+                } catch (error) {
+                    console.error('Error loading data:', error);
+                    this.modal.showNotification('Error loading data: ' + error.message, 'error');
+                }
+            }
+            
+            setupEventListeners() {
+                // Authentication
+                document.getElementById('loginBtn')?.addEventListener('click', () => this.handleLogin());
+                document.getElementById('registerBtn')?.addEventListener('click', () => this.handleRegister());
+                document.getElementById('logoutBtn')?.addEventListener('click', () => this.handleLogout());
+                document.getElementById('skipAuthBtn')?.addEventListener('click', () => this.skipAuth());
+                
+                // Navigation
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => this.handleNavigation(e.target.dataset.tab));
+                });
+                
+                // Allow Enter key on auth forms
+                document.getElementById('email')?.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.handleLogin();
+                });
+                document.getElementById('password')?.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.handleLogin();
+                });
+            }
+            
+            setupImportTab() {
+                // Set up CSV import functionality
+                const uploadBtn = document.getElementById('csvUploadBtn');
+                const fileInput = document.getElementById('csvFileInput');
+                const dropZone = document.getElementById('csvDropZone');
+                const confirmImportBtn = document.getElementById('confirmImportBtn');
+                const clearLogBtn = document.getElementById('clearLogBtn');
+
+                if (!uploadBtn || !fileInput || !dropZone) {
+                    console.log('Import UI elements not found');
+                    return;
+                }
+
+                // File upload button
+                uploadBtn.addEventListener('click', () => fileInput.click());
+                
+                // File input change
+                fileInput.addEventListener('change', (e) => {
+                    this.handleCSVFiles(Array.from(e.target.files));
+                });
+
+                // Drag and drop
+                dropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('dragover');
+                });
+
+                dropZone.addEventListener('dragleave', () => {
+                    dropZone.classList.remove('dragover');
+                });
+
+                dropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('dragover');
+                    const files = Array.from(e.dataTransfer.files).filter(f => 
+                        f.name.toLowerCase().endsWith('.csv')
+                    );
+                    this.handleCSVFiles(files);
+                });
+
+                // Confirm import button
+                confirmImportBtn?.addEventListener('click', () => this.confirmImport());
+                
+                // Clear log button
+                clearLogBtn?.addEventListener('click', () => this.clearImportLog());
+            }
+            
+            async handleCSVFiles(files) {
+                if (files.length === 0) {
+                    this.logImport('❌ No valid CSV files selected');
+                    return;
+                }
+
+                this.logImport(`🚀 Processing ${files.length} CSV files...`);
+                this.showProcessingStatus(files);
+
+                try {
+                    // Set up progress callbacks
+                    this.csvImporter.setProgressCallback((percent, message) => {
+                        this.updateProgress(percent, message);
+                    });
+
+                    this.csvImporter.setLogCallback((message) => {
+                        this.logImport(message);
+                    });
+
+                    // Process files
+                    const results = await this.csvImporter.processFiles(files);
+                    
+                    this.importPreviewData = results.transactions;
+                    this.displayImportResults(results);
+                    this.logImport(`✅ Processing complete! Found ${results.transactions.length} transactions`);
+
+                } catch (error) {
+                    this.logImport(`❌ Error processing files: ${error.message}`);
+                    console.error('CSV Import Error:', error);
+                }
+            }
+            
+            showProcessingStatus(files) {
+                const statusDiv = document.getElementById('processingStatus');
+                const filesList = document.getElementById('filesList');
+                
+                if (statusDiv) {
+                    statusDiv.classList.remove('hidden');
+                }
+                
+                if (filesList) {
+                    filesList.innerHTML = '';
+                    files.forEach((file, index) => {
+                        const fileDiv = document.createElement('div');
+                        fileDiv.className = 'flex justify-between items-center p-2 bg-gray-50 rounded';
+                        fileDiv.innerHTML = `
+                            <span class="text-sm">${file.name}</span>
+                            <span id="status-${index}" class="text-xs text-green-600">Processing...</span>
+                        `;
+                        filesList.appendChild(fileDiv);
+                    });
+                }
+            }
+            
+            updateProgress(percent, message) {
+                const progressBar = document.getElementById('progressBar');
+                const progressText = document.getElementById('progressText');
+                const progressPercent = document.getElementById('progressPercent');
+
+                if (progressBar) progressBar.style.width = `${percent}%`;
+                if (progressText) progressText.textContent = message;
+                if (progressPercent) progressPercent.textContent = `${Math.round(percent)}%`;
+            }
+            
+            displayImportResults(results) {
+                const resultsSection = document.getElementById('resultsSection');
+                const transactionPreview = document.getElementById('transactionPreview');
+                const importSummary = document.getElementById('importSummary');
+
+                if (resultsSection) resultsSection.classList.remove('hidden');
+
+                // Display transaction preview (first 20 transactions)
+                if (transactionPreview) {
+                    transactionPreview.innerHTML = '';
+                    const previewTransactions = results.transactions.slice(0, 20);
+                    
+                    previewTransactions.forEach(trans => {
+                        const row = document.createElement('tr');
+                        const typeColor = trans.type === 'Income' ? 'text-green-600' : 
+                                         trans.type === 'Expense' ? 'text-red-600' : 'text-blue-600';
+                        
+                        row.innerHTML = `
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                ${new Date(trans.date).toLocaleDateString()}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                ${trans.accountInfo?.name || 'Unknown'}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                ${trans.description}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm ${typeColor}">
+                                ${trans.type === 'Expense' ? '-' : ''}$${Math.abs(trans.amount).toFixed(2)}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                ${trans.category || 'Other'}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <span class="px-2 py-1 text-xs rounded-full ${typeColor} bg-opacity-10">
+                                    ${trans.type}
+                                </span>
+                            </td>
+                        `;
+                        transactionPreview.appendChild(row);
+                    });
+                }
+
+                // Display summary statistics
+                if (importSummary) {
+                    const totalIncome = results.transactions
+                        .filter(t => t.type === 'Income')
+                        .reduce((sum, t) => sum + t.amount, 0);
+                    
+                    const totalExpenses = results.transactions
+                        .filter(t => t.type === 'Expense')
+                        .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+                    
+                    const totalTransfers = results.transactions
+                        .filter(t => t.type === 'Transfer').length;
+
+                    importSummary.innerHTML = `
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <div class="text-sm font-medium text-green-800">Total Income</div>
+                            <div class="text-2xl font-bold text-green-600">${totalIncome.toFixed(2)}</div>
+                        </div>
+                        <div class="bg-red-50 p-4 rounded-lg">
+                            <div class="text-sm font-medium text-red-800">Total Expenses</div>
+                            <div class="text-2xl font-bold text-red-600">${totalExpenses.toFixed(2)}</div>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <div class="text-sm font-medium text-blue-800">Transfers</div>
+                            <div class="text-2xl font-bold text-blue-600">${totalTransfers}</div>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <div class="text-sm font-medium text-gray-800">Total Transactions</div>
+                            <div class="text-2xl font-bold text-gray-600">${results.transactions.length}</div>
+                        </div>
+                    `;
+                }
+            }
+            
+            async confirmImport() {
+                if (this.importPreviewData.length === 0) {
+                    this.logImport('❌ No transactions to import');
+                    return;
+                }
+
+                this.logImport(`💾 Importing ${this.importPreviewData.length} transactions...`);
+
+                try {
+                    let successCount = 0;
+                    
+                    for (const trans of this.importPreviewData) {
+                        try {
+                            await this.dataService.saveTransaction({
+                                description: trans.description,
+                                amount: trans.amount,
+                                type: trans.type,
+                                date: trans.date,
+                                accountId: trans.accountInfo?.accountNum || '',
+                                category: trans.category,
+                                entity: trans.entity || trans.accountInfo?.entity || 'Personal'
+                            });
+                            successCount++;
+                        } catch (error) {
+                            this.logImport(`❌ Failed to import: ${trans.description}`);
+                        }
+                    }
+
+                    this.logImport(`✅ Successfully imported ${successCount} transactions!`);
+                    
+                    // Refresh data and dashboard
+                    await this.loadData();
+                    
+                    // Clear preview data
+                    this.importPreviewData = [];
+                    document.getElementById('resultsSection')?.classList.add('hidden');
+                    document.getElementById('processingStatus')?.classList.add('hidden');
+
+                } catch (error) {
+                    this.logImport(`❌ Import failed: ${error.message}`);
+                }
+            }
+            
+            logImport(message) {
+                const logElement = document.getElementById('importLog');
+                if (logElement) {
+                    const timestamp = new Date().toLocaleTimeString();
+                    logElement.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+                    logElement.scrollTop = logElement.scrollHeight;
+                }
+                console.log(message);
+            }
+            
+            clearImportLog() {
+                const logElement = document.getElementById('importLog');
+                if (logElement) {
+                    logElement.innerHTML = 'Ready to import CSV files...';
+                }
+            }
+            
+            async handleLogin() {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                
+                if (!email || !password) {
+                    this.showAuthError('Please enter both email and password');
+                    return;
+                }
+                
+                try {
+                    console.log('Attempting login...');
+                    const result = await this.authService.signIn(email, password);
+                    console.log('Login successful:', result);
+                    // The onAuthStateChanged callback will handle the UI update
+                } catch (error) {
+                    console.error('Login error:', error);
+                    this.showAuthError(error.message || 'Login failed');
+                }
+            }
+            
+            async handleRegister() {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                
+                if (!email || !password) {
+                    this.showAuthError('Please enter both email and password');
+                    return;
+                }
+                
+                if (password.length < 6) {
+                    this.showAuthError('Password must be at least 6 characters');
+                    return;
+                }
+                
+                try {
+                    console.log('Attempting registration...');
+                    const result = await this.authService.signUp(email, password);
+                    console.log('Registration successful:', result);
+                    // The onAuthStateChanged callback will handle the UI update
+                } catch (error) {
+                    console.error('Registration error:', error);
+                    this.showAuthError(error.message || 'Registration failed');
+                }
+            }
+            
+            async handleLogout() {
+                await this.authService.signOut();
+            }
+            
+            handleNavigation(tab) {
+                // Update active nav button
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    btn.classList.remove('text-white', 'border-blue-600');
+                    btn.classList.add('text-blue-200');
+                });
+                
+                const activeBtn = document.querySelector(`[data-tab="${tab}"]`);
+                if (activeBtn) {
+                    activeBtn.classList.remove('text-blue-200');
+                    activeBtn.classList.add('text-white', 'border-b-2', 'border-blue-600');
+                }
+                
+                // Show active tab
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+                document.getElementById(tab)?.classList.remove('hidden');
+                
+                if (tab === 'dashboard') {
+                    if (this.dashboard) {
+                        this.dashboard.updateDashboard(this.transactions, this.accounts);
+                    }
+                } else if (tab === 'import') {
+                    // Delay setup to ensure DOM elements are visible
+                    setTimeout(() => this.setupImportTab(), 100);
+                }
+            }
+            
+            showMainApp() {
+                document.getElementById('authScreen')?.classList.add('hidden');
+                document.getElementById('mainApp')?.classList.remove('hidden');
+                if (this.currentUser) {
+                    const emailElement = document.getElementById('userEmail');
+                    if (emailElement) {
+                        emailElement.textContent = this.currentUser.email;
+                    }
+                }
+            }
+            
+            showAuthScreen() {
+                document.getElementById('authScreen')?.classList.remove('hidden');
+                document.getElementById('mainApp')?.classList.add('hidden');
+            }
+            
+            showAuthError(message) {
+                console.log('Auth error:', message);
+                const errorDiv = document.getElementById('authError');
+                if (errorDiv) {
+                    errorDiv.textContent = message;
+                    errorDiv.classList.remove('hidden');
+                    setTimeout(() => errorDiv.classList.add('hidden'), 5000);
+                }
+            }
+            
+            // Add skip authentication for testing
+            skipAuth() {
+                console.log('Skipping authentication for testing...');
+                this.currentUser = { uid: 'test-user', email: 'test@local.dev' };
+                this.showMainApp();
+                this.loadData();
+            }
+        }
+        
+        // Initialize app when DOM is ready
+        window.financeApp = new FinanceTrackerApp();
+        console.log('Finance Tracker App initialized');
+        
+    </script>
+</body>
+</html>

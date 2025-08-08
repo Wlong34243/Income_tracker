@@ -1,0 +1,33 @@
+{
+  "name": "finance-tracker-modular",
+  "version": "1.0.0",
+  "description": "Modular Personal Finance Tracker with Real Estate and Tech Business Analytics",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx http-server . -p 8080 -o",
+    "dev": "npx live-server . --port=8080",
+    "build": "echo 'No build step required'",
+    "test": "echo 'No tests yet'"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@tailwindcss/cli": "^4.1.11",
+    "firebase": "^9.22.0",
+    "papaparse": "^5.4.1",
+    "tailwindcss": "^4.1.11"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "live-server": "^1.2.2"
+  },
+  "keywords": [
+    "finance",
+    "tracker",
+    "modular",
+    "real-estate",
+    "business",
+    "analytics"
+  ],
+  "author": "Finance Tracker User",
+  "license": "MIT"
+}

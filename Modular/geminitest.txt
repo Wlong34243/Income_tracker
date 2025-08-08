@@ -1,0 +1,29 @@
+(async () => {
+  // This is a sample transaction.
+  const testTransaction = {
+    description: "COFFEE SHOP PURCHASE ANYTOWN",
+    amount: -4.50
+  };
+
+  try {
+    console.log("Sending test transaction to Gemini...");
+    // Access the geminiService through your global app object and call the function.
+    const result = await window.financeApp.geminiService.categorizeTransaction(testTransaction, { skipAI: false });
+
+    console.info("✅ Gemini API call successful!", result);
+    if (result && result.category && result.category !== 'Uncategorized') {
+      console.log(`Success! The transaction was categorized as: ${result.category}`);
+    } else {
+      console.warn("The API call worked, but a category wasn't returned. Check the response object.");
+    }
+
+  } catch (error) {
+    console.error("❌ Gemini API call failed. Check your API key, network connection, and the error details below.", error);
+  }
+})();
+VM1625:9 Sending test transaction to Gemini...
+VM1625:21 ❌ Gemini API call failed. Check your API key, network connection, and the error details below. TypeError: Cannot read properties of undefined (reading 'categorizeTransaction')
+    at <anonymous>:11:58
+    at <anonymous>:23:3
+(anonymous)	@	VM1625:21
+(anonymous)	@	VM1625:23
