@@ -156,6 +156,8 @@
         import { Modal } from './js/ui/Modal.js';
         import { NotificationManager } from './js/ui/NotificationManager.js';
         import { SettingsManager } from './js/ui/SettingsManager.js';
+        import { RulesManager } from './js/Rules/RulesManager.js';
+        import { TransactionRules } from './js/Rules/TransactionRules.js';
         import { EnhancedDashboard } from './js/ui/EnhancedDashboard.js';
         import { AIAssistant } from './js/ui/AIAssistant.js';
         import { DebugUtils } from './js/utils/DebugUtils.js';
@@ -181,7 +183,9 @@
                 
                 // Initialize UI managers
                 this.notificationManager = new NotificationManager();
-                this.settingsManager = new SettingsManager();
+                this.settingsManager = new SettingsManager(this.geminiService);
+                this.transactionRules = new TransactionRules();
+                this.rulesManager = new RulesManager(this.transactionRules);
                 
                 // Initialize properties
                 this.accounts = [];
@@ -190,7 +194,10 @@
                 this.init();
             }
 
-            init() {
+            async init() {
+                // Initialize services that might have async setup
+                await this.geminiService.initialize();
+
                 // Firebase is already initialized outside the module
                 this.authService.onAuthStateChanged(user => {
                     if (user) {
@@ -202,6 +209,26 @@
                 this.setupEventListeners();
                 this.addSettingsButton();
                 this.addManagementButtons(); // Call the new method
+                this.addRulesManagerButton();
+            }
+
+            addRulesManagerButton() {
+                const headerButtons = document.querySelector('.flex.items-center.space-x-4');
+                if (headerButtons) {
+                    const rulesBtn = document.createElement('button');
+                    rulesBtn.id = 'rulesManagerBtn';
+                    rulesBtn.className = 'bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition text-sm';
+                    rulesBtn.onclick = () => this.rulesManager.open();
+                    rulesBtn.innerHTML = `📜 Manage Rules`;
+
+                    const settingsBtn = document.getElementById('settingsBtn');
+                    if (settingsBtn) {
+                        headerButtons.insertBefore(rulesBtn, settingsBtn);
+                    } else {
+                        const logoutBtn = document.getElementById('logoutBtn');
+                        headerButtons.insertBefore(rulesBtn, logoutBtn);
+                    }
+                }
             }
             
             addSettingsButton() {

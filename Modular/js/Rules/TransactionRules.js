@@ -471,5 +471,4 @@ export class TransactionRules {
     }
 }
 
-// Export singleton instance
-export const transactionRules = new TransactionRules();
+// Exporting the class for instantiation

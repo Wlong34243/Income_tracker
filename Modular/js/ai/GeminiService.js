@@ -2,24 +2,40 @@
 // Fixed version with all issues resolved
 
 import { AppConfig } from '../config/AppConfig.js';
-import { SecureConfig } from '../../config.js'; // Import from root
 
 class GeminiService {
     constructor() {
-        // Try to get from localStorage first, then fall back to config file
-        this.apiKey = this.getApiKey() || (typeof SecureConfig !== 'undefined' && SecureConfig.GEMINI_API_KEY) || null;
+        this.apiKey = this.getApiKey(); // Get from localStorage initially
         this.apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
         this.transactionHistory = [];
-
-        if (!this.apiKey) {
-            console.warn('No Gemini API key configured. Please add your key to config.js or set it in Settings.');
-        }
 
         this.stats = {
             rulesApplied: 0,
             aiCalled: 0,
             fallbackUsed: 0
         };
+    }
+
+    async initialize() {
+        console.log('Initializing GeminiService...');
+        if (this.apiKey) {
+            console.log('API key already set from localStorage.');
+            return;
+        }
+
+        try {
+            const { SecureConfig } = await import('../../config.js');
+            if (SecureConfig && SecureConfig.GEMINI_API_KEY) {
+                this.setApiKey(SecureConfig.GEMINI_API_KEY);
+                console.log('API key set from config.js.');
+            }
+        } catch (e) {
+            console.warn('config.js not found or failed to load. Please set API key in settings.');
+        }
+
+        if (!this.apiKey) {
+            console.warn('No Gemini API key configured.');
+        }
     }
 
     getApiKey() {
@@ -29,10 +45,6 @@ class GeminiService {
     setApiKey(apiKey) {
         localStorage.setItem('gemini_api_key', apiKey);
         this.apiKey = apiKey;
-    }
-
-    initialize() {
-        console.log('GeminiService initialized with API key:', !!this.apiKey);
     }
 
     async categorizeTransaction(transaction, options = {}) {

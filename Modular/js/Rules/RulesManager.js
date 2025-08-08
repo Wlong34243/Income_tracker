@@ -1,17 +1,21 @@
-// js/ui/RulesManager.js
+// js/Rules/RulesManager.js
 
-import { transactionRules } from '../rules/TransactionRules.js';
+import { TransactionRules } from '../Rules/TransactionRules.js';
 import { DataService } from '../data/DataService.js';
 
 export class RulesManager {
-    constructor() {
+    constructor(transactionRules) {
+        if (!transactionRules) {
+            throw new Error("TransactionRules instance is required.");
+        }
+        this.transactionRules = transactionRules;
         this.initializeUI();
     }
 
     initializeUI() {
         // Add rules manager button to settings or menu
         const rulesButtonHtml = `
-            <button id="rulesManagerBtn" onclick="rulesManager.open()" 
+            <button id="rulesManagerBtn" onclick="window.financeApp.rulesManager.open()"
                     class="text-purple-600 hover:text-purple-800 text-sm font-medium">
                 Manage Rules
             </button>
@@ -32,7 +36,7 @@ export class RulesManager {
                         <div class="bg-purple-600 text-white p-4">
                             <div class="flex items-center justify-between">
                                 <h2 class="text-xl font-semibold">Transaction Rules Manager</h2>
-                                <button onclick="rulesManager.close()" class="text-white hover:text-gray-200">
+                                <button onclick="window.financeApp.rulesManager.close()" class="text-white hover:text-gray-200">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                     </svg>
@@ -43,23 +47,23 @@ export class RulesManager {
                         <div class="flex h-[calc(90vh-8rem)]">
                             <!-- Sidebar -->
                             <div class="w-64 bg-gray-50 p-4 border-r overflow-y-auto">
-                                <button onclick="rulesManager.showSection('overview')" 
+                                <button onclick="window.financeApp.rulesManager.showSection('overview')"
                                         class="w-full text-left px-3 py-2 rounded hover:bg-gray-200 mb-2 rule-section-btn active">
                                     Overview
                                 </button>
-                                <button onclick="rulesManager.showSection('custom')" 
+                                <button onclick="window.financeApp.rulesManager.showSection('custom')"
                                         class="w-full text-left px-3 py-2 rounded hover:bg-gray-200 mb-2 rule-section-btn">
                                     Custom Rules
                                 </button>
-                                <button onclick="rulesManager.showSection('create')" 
+                                <button onclick="window.financeApp.rulesManager.showSection('create')"
                                         class="w-full text-left px-3 py-2 rounded hover:bg-gray-200 mb-2 rule-section-btn">
                                     Create Rule
                                 </button>
-                                <button onclick="rulesManager.showSection('test')" 
+                                <button onclick="window.financeApp.rulesManager.showSection('test')"
                                         class="w-full text-left px-3 py-2 rounded hover:bg-gray-200 mb-2 rule-section-btn">
                                     Test Rules
                                 </button>
-                                <button onclick="rulesManager.showSection('import-export')" 
+                                <button onclick="window.financeApp.rulesManager.showSection('import-export')"
                                         class="w-full text-left px-3 py-2 rounded hover:bg-gray-200 rule-section-btn">
                                     Import/Export
                                 </button>
@@ -74,7 +78,7 @@ export class RulesManager {
                                     <div class="grid grid-cols-3 gap-4 mb-6">
                                         <div class="bg-blue-50 p-4 rounded-lg">
                                             <p class="text-sm text-blue-600">Built-in Rules</p>
-                                            <p class="text-2xl font-bold text-blue-800">${transactionRules.rules.length}</p>
+                                            <p class="text-2xl font-bold text-blue-800">${this.transactionRules.rules.length}</p>
                                         </div>
                                         <div class="bg-purple-50 p-4 rounded-lg">
                                             <p class="text-sm text-purple-600">Custom Rules</p>
@@ -161,7 +165,7 @@ export class RulesManager {
                                         </div>
                                         
                                         <div class="flex justify-end space-x-3 pt-4">
-                                            <button type="button" onclick="rulesManager.clearForm()"
+                                            <button type="button" onclick="window.financeApp.rulesManager.clearForm()"
                                                     class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
                                                 Clear
                                             </button>
@@ -203,7 +207,7 @@ export class RulesManager {
                                             </div>
                                         </div>
                                         
-                                        <button onclick="rulesManager.testRules()"
+                                        <button onclick="window.financeApp.rulesManager.testRules()"
                                                 class="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700">
                                             Test Rules
                                         </button>
@@ -222,7 +226,7 @@ export class RulesManager {
                                         <div>
                                             <h4 class="font-medium mb-3">Export Custom Rules</h4>
                                             <p class="text-sm text-gray-600 mb-3">Download your custom rules for backup or sharing</p>
-                                            <button onclick="rulesManager.exportRules()"
+                                            <button onclick="window.financeApp.rulesManager.exportRules()"
                                                     class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
                                                 Export Rules
                                             </button>
@@ -232,7 +236,7 @@ export class RulesManager {
                                             <h4 class="font-medium mb-3">Import Custom Rules</h4>
                                             <p class="text-sm text-gray-600 mb-3">Import rules from a backup file</p>
                                             <input type="file" id="importFile" accept=".json" class="mb-3">
-                                            <button onclick="rulesManager.importRules()"
+                                            <button onclick="window.financeApp.rulesManager.importRules()"
                                                     class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
                                                 Import Rules
                                             </button>
@@ -290,14 +294,14 @@ export class RulesManager {
 
     loadOverview() {
         // Update counts
-        document.getElementById('customRuleCount').textContent = transactionRules.customPatterns.length;
+        document.getElementById('customRuleCount').textContent = this.transactionRules.customPatterns.length;
         
         // Load statistics from localStorage or geminiService
         const stats = JSON.parse(localStorage.getItem('ruleStatistics') || '{}');
         document.getElementById('rulesAppliedCount').textContent = stats.totalApplied || 0;
         
         // Display built-in rules
-        const rulesHtml = transactionRules.rules.map(rule => `
+        const rulesHtml = this.transactionRules.rules.map(rule => `
             <div class="bg-gray-50 p-3 rounded">
                 <div class="flex justify-between items-center">
                     <span class="font-medium">${rule.name}</span>
@@ -310,7 +314,7 @@ export class RulesManager {
     }
 
     loadCustomRules() {
-        const customRules = transactionRules.customPatterns;
+        const customRules = this.transactionRules.customPatterns;
         
         if (customRules.length === 0) {
             document.getElementById('customRulesList').innerHTML = 
@@ -330,7 +334,7 @@ export class RulesManager {
                             ${rule.account ? `<br>Account: ${rule.account}` : ''}
                         </p>
                     </div>
-                    <button onclick="rulesManager.deleteRule('${rule.id}')"
+                    <button onclick="window.financeApp.rulesManager.deleteRule('${rule.id}')"
                             class="text-red-600 hover:text-red-800">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
@@ -395,7 +399,7 @@ export class RulesManager {
             entity: this.determineEntity(document.getElementById('ruleAccount').value)
         };
         
-        transactionRules.addCustomPattern(rule);
+        this.transactionRules.addCustomPattern(rule);
         
         this.showNotification('Rule created successfully!', 'success');
         this.clearForm();
@@ -408,8 +412,8 @@ export class RulesManager {
 
     deleteRule(ruleId) {
         if (confirm('Are you sure you want to delete this rule?')) {
-            transactionRules.customPatterns = transactionRules.customPatterns.filter(r => r.id !== ruleId);
-            transactionRules.saveCustomPatterns();
+            this.transactionRules.customPatterns = this.transactionRules.customPatterns.filter(r => r.id !== ruleId);
+            this.transactionRules.saveCustomPatterns();
             this.loadCustomRules();
             this.showNotification('Rule deleted', 'info');
         }
@@ -427,7 +431,7 @@ export class RulesManager {
             date: new Date().toISOString().split('T')[0]
         };
         
-        const result = transactionRules.applyRules(testTransaction);
+        const result = this.transactionRules.applyRules(testTransaction);
         
         const resultsDiv = document.getElementById('testResults');
         resultsDiv.classList.remove('hidden');
@@ -462,7 +466,7 @@ export class RulesManager {
         const exportData = {
             version: '1.0',
             exportDate: new Date().toISOString(),
-            customRules: transactionRules.customPatterns,
+            customRules: this.transactionRules.customPatterns,
             statistics: JSON.parse(localStorage.getItem('ruleStatistics') || '{}')
         };
         
@@ -492,7 +496,7 @@ export class RulesManager {
                 const data = JSON.parse(e.target.result);
                 
                 if (data.customRules && Array.isArray(data.customRules)) {
-                    transactionRules.importCustomPatterns(data.customRules);
+                    this.transactionRules.importCustomPatterns(data.customRules);
                     this.showNotification(`Imported ${data.customRules.length} rules successfully`, 'success');
                     this.loadCustomRules();
                 } else {
