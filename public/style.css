@@ -1,24 +1,115 @@
+/* Modal and UI Enhancements */
 .modal-overlay {
     background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(2px);
 }
+
 .progress-bar {
     transition: width 0.3s ease;
 }
+
 .csv-drop-zone, .pdf-drop-zone {
     border: 2px dashed #d1d5db;
     transition: all 0.3s ease;
+    cursor: pointer;
 }
+
 .csv-drop-zone.dragover, .pdf-drop-zone.dragover {
     border-color: #3b82f6;
     background-color: #eff6ff;
 }
+
 .baseline-card {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
+
 .lisa-income-card {
     background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
 }
+
 .investment-card {
     background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+/* Tab Navigation */
+.nav-tab {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.nav-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: #3b82f6;
+}
+
+/* Cards and Components */
+.metric-card {
+    transition: transform 0.2s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+}
+
+/* Transaction List Items */
+.transaction-item {
+    transition: all 0.2s ease;
+}
+
+.transaction-item:hover {
+    background-color: #f9fafb;
+}
+
+/* Dropdown Animations */
+.dropdown-content {
+    transform-origin: top;
+    transition: all 0.2s ease;
+}
+
+/* Loading States */
+.skeleton {
+    background: linear-gradient(90deg, #f3f4f6 0%, #e5e7eb 50%, #f3f4f6 100%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Import Preview Table */
+.import-preview-table {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+/* Status Badges */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 9999px;
+}
+
+.status-badge.success {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.status-badge.warning {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.status-badge.error {
+    background-color: #fee2e2;
+    color: #991b1b;
 }
