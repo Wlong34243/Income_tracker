@@ -460,39 +460,5 @@
     </script>
     
     <script src="https://unpkg.com/@google/generative-ai/dist/index.umd.js"></script>
-
-    <script>
-        // IMPORTANT: In a real application, you should not expose your API key like this.
-        // This is for demonstration purposes only.
-        const API_KEY = 'AIzaSyA4lwOuimRwUXtSbChOmkkSa2zGv4RzrUI';
-        
-        // Function to run Gemini AI code once the library is loaded
-        function runGemini() {
-            // Check if the google.generativeai object is available
-            if (window.google && window.google.generativeai) {
-                const genAI = new google.generativeai.GoogleGenerativeAI(API_KEY);
-
-                async function callGeminiPrompt() {
-                    try {
-                        const model = genAI.getGenerativeModel({ model: "gemini-pro"});
-                        const prompt = 'Say hello in 3 languages';
-                        const result = await model.generateContent(prompt);
-                        const response = await result.response;
-                        const text = response.text();
-                        console.log(text);
-                    } catch (error) {
-                        console.error('Error generating content:', error);
-                    }
-                }
-                callGeminiPrompt(); // Call the function to run the prompt
-            } else {
-                // If not loaded yet, try again after a short delay
-                setTimeout(runGemini, 100); // Poll every 100ms
-            }
-        }
-
-        // Start the polling when the window loads
-        window.onload = runGemini;
-    </script>
 </body>
 </html>
