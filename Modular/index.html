@@ -148,6 +148,7 @@
         import { AppConfig } from './js/config/AppConfig.js';
         import { AuthService } from './js/auth/AuthService.js';
         import { DataService } from './js/data/DataService.js';
+        import { GeminiService } from './js/ai/GeminiService.js';
         import { EnhancedCSVImporter } from './js/import/EnhancedCSVImporter.js'; 
         import { AnalyticsEngine } from './js/analytics/AnalyticsEngine.js';
         import { Dashboard } from './js/ui/Dashboard.js';
@@ -155,6 +156,8 @@
         import { Modal } from './js/ui/Modal.js';
         import { NotificationManager } from './js/ui/NotificationManager.js';
         import { SettingsManager } from './js/ui/SettingsManager.js';
+        import { RulesManager } from './js/Rules/RulesManager.js';
+        import { TransactionRules } from './js/Rules/TransactionRules.js';
         import { EnhancedDashboard } from './js/ui/EnhancedDashboard.js';
         import { AIAssistant } from './js/ui/AIAssistant.js';
         import { DebugUtils } from './js/utils/DebugUtils.js';
@@ -165,9 +168,10 @@
                 // Initialize core services
                 this.authService = new AuthService();
                 this.dataService = new DataService(this.authService);
+                this.geminiService = new GeminiService();
                 
                 // IMPORTANT: Pass dataService to EnhancedCSVImporter
-                this.csvImporter = new EnhancedCSVImporter(this.dataService);
+                this.csvImporter = new EnhancedCSVImporter(this.dataService, this.geminiService);
                 
                 // Initialize other services
                 this.analytics = new AnalyticsEngine(this.dataService);
@@ -179,7 +183,9 @@
                 
                 // Initialize UI managers
                 this.notificationManager = new NotificationManager();
-                this.settingsManager = new SettingsManager();
+                this.settingsManager = new SettingsManager(this.geminiService);
+                this.transactionRules = new TransactionRules();
+                this.rulesManager = new RulesManager(this.transactionRules);
                 
                 // Initialize properties
                 this.accounts = [];
@@ -188,7 +194,10 @@
                 this.init();
             }
 
-            init() {
+            async init() {
+                // Initialize services that might have async setup
+                await this.geminiService.initialize();
+
                 // Firebase is already initialized outside the module
                 this.authService.onAuthStateChanged(user => {
                     if (user) {
@@ -200,6 +209,26 @@
                 this.setupEventListeners();
                 this.addSettingsButton();
                 this.addManagementButtons(); // Call the new method
+                this.addRulesManagerButton();
+            }
+            
+            addRulesManagerButton() {
+                const headerButtons = document.querySelector('.flex.items-center.space-x-4');
+                if (headerButtons) {
+                    const rulesBtn = document.createElement('button');
+                    rulesBtn.id = 'rulesManagerBtn';
+                    rulesBtn.className = 'bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition text-sm';
+                    rulesBtn.onclick = () => this.rulesManager.open();
+                    rulesBtn.innerHTML = `📜 Manage Rules`;
+                    
+                    const settingsBtn = document.getElementById('settingsBtn');
+                    if (settingsBtn) {
+                        headerButtons.insertBefore(rulesBtn, settingsBtn);
+                    } else {
+                        const logoutBtn = document.getElementById('logoutBtn');
+                        headerButtons.insertBefore(rulesBtn, logoutBtn);
+                    }
+                }
             }
             
             addSettingsButton() {
@@ -460,39 +489,5 @@
     </script>
     
     <script src="https://unpkg.com/@google/generative-ai/dist/index.umd.js"></script>
-
-    <script>
-        // IMPORTANT: In a real application, you should not expose your API key like this.
-        // This is for demonstration purposes only.
-        const API_KEY = 'AIzaSyA4lwOuimRwUXtSbChOmkkSa2zGv4RzrUI';
-        
-        // Function to run Gemini AI code once the library is loaded
-        function runGemini() {
-            // Check if the google.generativeai object is available
-            if (window.google && window.google.generativeai) {
-                const genAI = new google.generativeai.GoogleGenerativeAI(API_KEY);
-
-                async function callGeminiPrompt() {
-                    try {
-                        const model = genAI.getGenerativeModel({ model: "gemini-pro"});
-                        const prompt = 'Say hello in 3 languages';
-                        const result = await model.generateContent(prompt);
-                        const response = await result.response;
-                        const text = response.text();
-                        console.log(text);
-                    } catch (error) {
-                        console.error('Error generating content:', error);
-                    }
-                }
-                callGeminiPrompt(); // Call the function to run the prompt
-            } else {
-                // If not loaded yet, try again after a short delay
-                setTimeout(runGemini, 100); // Poll every 100ms
-            }
-        }
-
-        // Start the polling when the window loads
-        window.onload = runGemini;
-    </script>
 </body>
 </html>
