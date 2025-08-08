@@ -67,3 +67,19 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+# Sensitive configuration files
+Modular/config.js
+config.js
+**/config.js
+
+# But allow example configs
+!config.example.js
+!**/config.example.js
+# Sensitive configuration files
+Modular/config.js
+config.js
+**/config.js
+
+# But allow example configs
+!config.example.js
+!**/config.example.js
