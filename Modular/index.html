@@ -156,11 +156,10 @@
         import { Modal } from './js/ui/Modal.js';
         import { NotificationManager } from './js/ui/NotificationManager.js';
         import { SettingsManager } from './js/ui/SettingsManager.js';
-        import { RulesManager } from './js/Rules/RulesManager.js';
-        import { TransactionRules } from './js/Rules/TransactionRules.js';
         import { EnhancedDashboard } from './js/ui/EnhancedDashboard.js';
         import { AIAssistant } from './js/ui/AIAssistant.js';
         import { DebugUtils } from './js/utils/DebugUtils.js';
+        import { CategoryManager } from './js/categorization/CategoryManager.js';
 
         // Main Application Class
         class ModularFinanceTracker {
@@ -171,7 +170,7 @@
                 this.geminiService = new GeminiService();
                 
                 // IMPORTANT: Pass dataService to EnhancedCSVImporter
-                this.csvImporter = new EnhancedCSVImporter(this.dataService, this.geminiService);
+                this.csvImporter = new EnhancedCSVImporter(this.dataService, this.geminiService, this.categoryManager);
                 
                 // Initialize other services
                 this.analytics = new AnalyticsEngine(this.dataService);
@@ -184,8 +183,7 @@
                 // Initialize UI managers
                 this.notificationManager = new NotificationManager();
                 this.settingsManager = new SettingsManager(this.geminiService);
-                this.transactionRules = new TransactionRules();
-                this.rulesManager = new RulesManager(this.transactionRules);
+                this.categoryManager = new CategoryManager();
                 
                 // Initialize properties
                 this.accounts = [];
@@ -197,6 +195,7 @@
             async init() {
                 // Initialize services that might have async setup
                 await this.geminiService.initialize();
+                await this.categoryManager.init();
 
                 // Firebase is already initialized outside the module
                 this.authService.onAuthStateChanged(user => {
@@ -209,26 +208,6 @@
                 this.setupEventListeners();
                 this.addSettingsButton();
                 this.addManagementButtons(); // Call the new method
-                this.addRulesManagerButton();
-            }
-
-            addRulesManagerButton() {
-                const headerButtons = document.querySelector('.flex.items-center.space-x-4');
-                if (headerButtons) {
-                    const rulesBtn = document.createElement('button');
-                    rulesBtn.id = 'rulesManagerBtn';
-                    rulesBtn.className = 'bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition text-sm';
-                    rulesBtn.onclick = () => this.rulesManager.open();
-                    rulesBtn.innerHTML = `📜 Manage Rules`;
-
-                    const settingsBtn = document.getElementById('settingsBtn');
-                    if (settingsBtn) {
-                        headerButtons.insertBefore(rulesBtn, settingsBtn);
-                    } else {
-                        const logoutBtn = document.getElementById('logoutBtn');
-                        headerButtons.insertBefore(rulesBtn, logoutBtn);
-                    }
-                }
             }
             
             addSettingsButton() {

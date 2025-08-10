@@ -4,21 +4,27 @@ import { AppConfig } from '../config/AppConfig.js';
 import { DataService } from '../data/DataService.js';
 import { DuplicateDetector } from './DuplicateDetector.js';
 import { GeminiService } from '../ai/GeminiService.js';
+import { CategoryManager } from '../categorization/CategoryManager.js';
 
 export class EnhancedCSVImporter {
     /**
      * @param {DataService} dataService An instance of the DataService to interact with application data.
      * @param {GeminiService} geminiService An instance of the GeminiService for AI categorization.
+     * @param {CategoryManager} categoryManager An instance of the CategoryManager for categorization.
      */
-    constructor(dataService, geminiService) {
+    constructor(dataService, geminiService, categoryManager) {
         if (!dataService) {
             throw new Error("DataService instance is required.");
         }
         if (!geminiService) {
             throw new Error("GeminiService instance is required.");
         }
+        if (!categoryManager) {
+            throw new Error("CategoryManager instance is required.");
+        }
         this.dataService = dataService;
         this.geminiService = geminiService;
+        this.categoryManager = categoryManager;
         this.importResults = null;
         this.categorizedTransactions = [];
         this.duplicates = [];
@@ -257,7 +263,7 @@ export class EnhancedCSVImporter {
                 }
                 
                 // Safety check to ensure categorization is always an object
-                const categorization = await this.geminiService.categorizeTransaction(transaction, { skipAI: true }) || {
+                const categorization = this.categoryManager.categorizeTransaction(transaction) || {
                     category: 'Uncategorized',
                     confidence: 0.3,
                     method: 'fallback',
