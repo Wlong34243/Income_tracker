@@ -174,7 +174,7 @@
                 this.dashboard = new Dashboard(this.analytics);
                 this.modal = new Modal(this);
                 this.enhancedDashboard = new EnhancedDashboard(this);
-                this.aiAssistant = new AIAssistant(this.dataService);
+                this.aiAssistant = new AIAssistant(this.dataService, this.categoryIntegration.categoryManager);
                 
                 // Initialize UI managers
                 this.notificationManager = new NotificationManager();

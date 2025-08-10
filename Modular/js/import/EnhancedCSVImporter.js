@@ -46,7 +46,7 @@ export class EnhancedCSVImporter {
                                 </button>
                             </div>
                         </div>
-                        
+
                         <div class="flex border-b">
                             <div class="px-6 py-3 import-step active-step" data-step="upload">
                                 <span class="font-medium">1. Upload</span>
@@ -58,13 +58,13 @@ export class EnhancedCSVImporter {
                                 <span class="font-medium">3. Confirm</span>
                             </div>
                         </div>
-                        
+
                         <div class="p-6 overflow-y-auto flex-grow">
                             <div id="uploadStep" class="import-content">
                                 <div class="max-w-2xl mx-auto">
                                     <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition cursor-pointer" id="dropZone">
                                         <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
                                         </svg>
                                         <p class="mb-2 text-sm text-gray-600">
@@ -76,7 +76,7 @@ export class EnhancedCSVImporter {
                                         <p class="text-xs text-gray-500">CSV files (e.g., from Chase, Amex, etc.)</p>
                                         <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="window.csvImporter.handleFileSelect(event); event.target.blur();">
                                     </div>
-                                    
+
                                     <div class="mt-6 bg-gray-50 p-4 rounded-lg">
                                         <h4 class="font-medium mb-2">Important:</h4>
                                         <ul class="text-sm text-gray-600 space-y-1">
@@ -86,24 +86,24 @@ export class EnhancedCSVImporter {
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div id="reviewStep" class="import-content hidden">
                                 <div id="importAlerts"></div>
                                 <div class="mb-4 flex justify-between items-center">
                                     <div>
                                         <h3 class="text-lg font-semibold">Review Transactions</h3>
                                         <p class="text-sm text-gray-600 mt-1">
-                                            <span id="totalCount">0</span> transactions found • 
-                                            <span id="duplicateCount">0</span> duplicates • 
+                                            <span id="totalCount">0</span> transactions found •
+                                            <span id="duplicateCount">0</span> duplicates •
                                             <span id="newCount">0</span> new
                                         </p>
                                     </div>
                                     <div class="flex space-x-2">
-                                        <button onclick="csvImporter.categorizeAll()" 
+                                        <button onclick="csvImporter.categorizeAll()"
                                                 class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 text-sm">
                                             AI Categorize Uncertain
                                         </button>
-                                        <select id="filterCategory" onchange="csvImporter.filterTransactions()" 
+                                        <select id="filterCategory" onchange="csvImporter.filterTransactions()"
                                                 class="border rounded px-3 py-2 text-sm">
                                             <option value="">All Categories</option>
                                             <option value="uncategorized">Uncategorized</option>
@@ -111,14 +111,14 @@ export class EnhancedCSVImporter {
                                         </select>
                                     </div>
                                 </div>
-                                
+
                                 <div id="categoryStats" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                                     </div>
-                                
+
                                 <div id="transactionsList" class="space-y-2 max-h-96 overflow-y-auto">
                                     </div>
                             </div>
-                            
+
                             <div id="confirmStep" class="import-content hidden">
                                 <div class="max-w-2xl mx-auto">
                                     <h3 class="text-lg font-semibold mb-4">Import Summary</h3>
@@ -136,7 +136,7 @@ export class EnhancedCSVImporter {
                 </div>
             </div>
         `;
-        
+
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         this.setupDragAndDrop();
     }
@@ -150,7 +150,7 @@ export class EnhancedCSVImporter {
         document.getElementById('importModal').classList.add('hidden');
         this.resetImport();
     }
-    
+
     setupDragAndDrop() {
         const dropZone = document.getElementById('dropZone');
         if (!dropZone) return;
@@ -184,24 +184,24 @@ export class EnhancedCSVImporter {
     handleFileSelect(event) {
         const file = event.target.files[0];
         if (!file) return;
-    
+
         // Prevent re-triggering
         event.preventDefault();
         event.stopPropagation();
-    
+
         this.selectedFile = file;
         this.selectedFileName = file.name;
-    
+
         // Update UI to show selected file
         const label = document.querySelector('label[for="csvFileInput"]');
         if (label) {
             label.textContent = `Selected: ${file.name}`;
             label.classList.add('text-green-600');
         }
-    
+
         // Auto-process the file
         this.processFile();
-    
+
         // Clear the input value to allow re-selecting the same file
         event.target.value = '';
     }
@@ -214,19 +214,19 @@ export class EnhancedCSVImporter {
             this.showLoading('Parsing CSV file...');
             const text = await this.readFile(file);
             const accountId = this.detectAccountFromFilename(file.name);
-            
+
             if (!accountId) {
                 throw new Error('Could not determine account from filename. Please ensure the filename contains the last 4 digits of the account number.');
             }
-            
+
             const transactions = this.parseCSV(text, accountId);
-            
+
             if (transactions.length === 0) {
                 throw new Error('No valid transactions found in file');
             }
 
             await this.processTransactions(transactions, accountId);
-            
+
             this.goToStep('review');
         } catch (error) {
             this.showError('Import Error: ' + error.message);
@@ -236,15 +236,15 @@ export class EnhancedCSVImporter {
 
     async processTransactions(transactions, accountId) {
         this.showLoading('Processing transactions...');
-        
+
         // Fetch existing transactions to check for duplicates
         const existingTransactions = await this.dataService.getAllTransactions();
         const duplicateDetector = new DuplicateDetector(existingTransactions);
-        
+
         this.categorizedTransactions = [];
         this.duplicates = [];
         this.failedRows = [];
-        
+
         for (const transaction of transactions) {
             try {
                 if (!transaction || typeof transaction !== 'object') {
@@ -255,7 +255,7 @@ export class EnhancedCSVImporter {
                     this.duplicates.push(transaction);
                     continue;
                 }
-                
+
                 // Safety check to ensure categorization is always an object
                 const categorization = await this.geminiService.categorizeTransaction(transaction, { skipAI: true }) || {
                     category: 'Uncategorized',
@@ -263,7 +263,7 @@ export class EnhancedCSVImporter {
                     method: 'fallback',
                     reasoning: 'Default categorization'
                 };
-                
+
                 this.categorizedTransactions.push({
                     ...transaction,
                     ...categorization,
@@ -276,17 +276,17 @@ export class EnhancedCSVImporter {
                 this.failedRows.push({ transaction, error: error.message });
             }
         }
-        
+
         this.updateReviewStats();
         this.renderTransactions();
         this.displayImportAlerts();
         this.hideLoading();
     }
-    
+
     displayImportAlerts() {
         const container = document.getElementById('importAlerts');
         if (!container) return;
-        
+
         if (this.failedRows.length > 0) {
             container.innerHTML = `
                 <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
@@ -310,7 +310,7 @@ export class EnhancedCSVImporter {
             lowConfidence: 0,
             uncategorized: 0
         };
-        
+
         this.categorizedTransactions.forEach(txn => {
             if (!txn.category || txn.category === 'Uncategorized') stats.uncategorized++;
             else if (txn.method === 'rule' && txn.confidence >= 0.8) stats.ruleMatched++;
@@ -318,11 +318,11 @@ export class EnhancedCSVImporter {
             else if (txn.confidence < 0.7) stats.lowConfidence++;
             else stats.ruleMatched++;
         });
-        
+
         document.getElementById('totalCount').textContent = stats.total;
         document.getElementById('duplicateCount').textContent = stats.duplicates;
         document.getElementById('newCount').textContent = stats.new;
-        
+
         document.getElementById('categoryStats').innerHTML = `
             <div class="bg-green-50 p-3 rounded"><p class="text-sm text-green-600">Rule Matched</p><p class="text-xl font-bold text-green-800">${stats.ruleMatched}</p></div>
             <div class="bg-purple-50 p-3 rounded"><p class="text-sm text-purple-600">AI Suggested</p><p class="text-xl font-bold text-purple-800">${stats.aiSuggested}</p></div>
@@ -334,16 +334,16 @@ export class EnhancedCSVImporter {
     renderTransactions(filter = '') {
         const container = document.getElementById('transactionsList');
         let transactionsToShow = this.categorizedTransactions;
-        
+
         if (filter === 'uncategorized') transactionsToShow = transactionsToShow.filter(t => !t.category || t.category === 'Uncategorized');
         else if (filter === 'low-confidence') transactionsToShow = transactionsToShow.filter(t => t.confidence < 0.7);
-        
+
         container.innerHTML = transactionsToShow.map((txn) => {
             const originalIndex = this.categorizedTransactions.indexOf(txn);
             const confidence = txn.confidence || 0;
             const confidenceColor = confidence >= 0.8 ? 'green' : confidence >= 0.6 ? 'yellow' : 'red';
             const methodIcon = txn.method === 'rule' ? '⚡' : txn.method === 'ai' ? '🤖' : '❓';
-            
+
             return `
                 <div class="border rounded-lg p-3 bg-white hover:shadow-sm transition" data-index="${originalIndex}">
                     <div class="flex justify-between items-start">
@@ -371,7 +371,7 @@ export class EnhancedCSVImporter {
     async categorizeAll() {
         const uncategorized = this.categorizedTransactions.filter(t => !t.category || t.category === 'Uncategorized' || t.confidence < 0.7);
         if (uncategorized.length === 0) return this.showNotification('All transactions are already categorized!', 'info');
-        
+
         this.showLoading(`Categorizing ${uncategorized.length} transactions with AI...`);
         try {
             const results = await this.geminiService.batchCategorize(uncategorized, { skipAI: false });
@@ -400,7 +400,7 @@ export class EnhancedCSVImporter {
         document.querySelectorAll('.import-step').forEach(el => el.classList.toggle('active-step', el.dataset.step === step));
         document.querySelectorAll('.import-content').forEach(el => el.classList.add('hidden'));
         document.getElementById(`${step}Step`).classList.remove('hidden');
-        
+
         const backButton = document.getElementById('backButton');
         const nextButton = document.getElementById('nextButton');
         const confirmButton = document.getElementById('confirmButton');
@@ -411,7 +411,7 @@ export class EnhancedCSVImporter {
 
         if (step === 'confirm') this.prepareImportSummary();
     }
-    
+
     goNext() {
         if (this.currentStep === 'upload' && this.categorizedTransactions.length > 0) this.goToStep('review');
         else if (this.currentStep === 'review') this.goToStep('confirm');
@@ -512,7 +512,7 @@ export class EnhancedCSVImporter {
             else if (char === ',' && !inQuotes) {
                 result.push(current.trim());
                 current = '';
-            } else { 
+            } else {
                 current += char;
             }
         }
@@ -524,23 +524,23 @@ export class EnhancedCSVImporter {
     parseCSV(text, accountId) {
         const lines = text.trim().split('\n');
         const transactions = [];
-        
+
         if (lines.length <= 1) return transactions;
 
         // Get header to detect format
         const header = lines[0].toLowerCase();
-        
+
         // Detect format type
         const isChaseCredit = header.includes('card') && header.includes('transaction date');
         const isChaseChecking = header.includes('details') && header.includes('posting date');
-        
+
         console.log(`Parsing CSV: ${isChaseCredit ? 'Credit Card' : isChaseChecking ? 'Checking' : 'Unknown'} format for account ${accountId}`);
-        
+
         for (let i = 1; i < lines.length; i++) {
             if (!lines[i].trim()) continue;
-            
+
             const parts = this.parseCSVLine(lines[i]);
-            
+
             if (isChaseCredit && parts.length >= 7) {
                 // Credit card format: Card, Transaction Date, Post Date, Description, Category, Type, Amount, Memo
                 const amount = parseFloat(parts[6]) || 0;
@@ -583,7 +583,7 @@ export class EnhancedCSVImporter {
                 }
             }
         }
-        
+
         console.log(`Parsed ${transactions.length} valid transactions from CSV`);
         return transactions;
     }
@@ -602,7 +602,7 @@ export class EnhancedCSVImporter {
 
     parseDate(dateString) {
         if (!dateString) return new Date().toISOString().split('T')[0];
-        
+
         // Handle MM/DD/YYYY format
         if (dateString.includes('/')) {
             const parts = dateString.split('/');
@@ -614,11 +614,11 @@ export class EnhancedCSVImporter {
                 }
             }
         }
-        
+
         // Try standard parse
         const date = new Date(dateString);
-        return isNaN(date.getTime()) ? 
-            new Date().toISOString().split('T')[0] : 
+        return isNaN(date.getTime()) ?
+            new Date().toISOString().split('T')[0] :
             date.toISOString().split('T')[0];
     }
 

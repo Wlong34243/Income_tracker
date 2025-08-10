@@ -3,12 +3,12 @@
 
 import { geminiService } from '../ai/GeminiService.js';
 import { DataService } from '../data/DataService.js';
-import { transactionRules } from '../rules/TransactionRules.js';
 import { AppConfig } from '../config/AppConfig.js';
 
 export class AIAssistant {
-    constructor(dataService) {
+    constructor(dataService, categoryManager) {
         this.dataService = dataService;
+        this.categoryManager = categoryManager;
         this.chatHistory = [];
         this.isOpen = false;
         this.initializeUI();
@@ -210,9 +210,10 @@ export class AIAssistant {
         // Show first 5 uncategorized
         const toShow = uncategorized.slice(0, 5);
         toShow.forEach(t => {
-            const suggestion = transactionRules.categorize(t);
+            const suggestion = this.categoryManager.categorizeTransaction(t);
+            const categoryName = suggestion.subcategory ? `${suggestion.category} / ${suggestion.subcategory}` : suggestion.category;
             response += `• ${t.description} ($${Math.abs(t.amount).toFixed(2)})\n`;
-            response += `  Suggested: ${suggestion.category} (${Math.round(suggestion.confidence * 100)}% confidence)\n\n`;
+            response += `  Suggested: ${categoryName} (${Math.round(suggestion.confidence * 100)}% confidence)\n\n`;
         });
         
         if (uncategorized.length > 5) {
