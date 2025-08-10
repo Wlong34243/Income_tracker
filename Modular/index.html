@@ -149,7 +149,7 @@
         import { AuthService } from './js/auth/AuthService.js';
         import { DataService } from './js/data/DataService.js';
         import { GeminiService } from './js/ai/GeminiService.js';
-        import { EnhancedCSVImporter } from './js/import/EnhancedCSVImporter.js'; 
+        import { CategoryAwareCSVImporter } from './js/import/CategoryAwareCSVImporter.js';
         import { AnalyticsEngine } from './js/analytics/AnalyticsEngine.js';
         import { Dashboard } from './js/ui/Dashboard.js';
         import { Modal } from './js/ui/Modal.js';
@@ -171,7 +171,7 @@
                 this.categoryManager = new CategoryManager();
                 
                 // IMPORTANT: Pass dataService to EnhancedCSVImporter
-                this.csvImporter = new EnhancedCSVImporter(this.dataService, this.geminiService, this.categoryManager);
+                this.csvImporter = new CategoryAwareCSVImporter(this.dataService, this.categoryManager);
                 
                 // Initialize other services
                 this.analytics = new AnalyticsEngine(this.dataService);
