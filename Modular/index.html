@@ -152,7 +152,6 @@
         import { EnhancedCSVImporter } from './js/import/EnhancedCSVImporter.js'; 
         import { AnalyticsEngine } from './js/analytics/AnalyticsEngine.js';
         import { Dashboard } from './js/ui/Dashboard.js';
-        import { TransactionUI } from './js/ui/TransactionUI.js'; 
         import { Modal } from './js/ui/Modal.js';
         import { NotificationManager } from './js/ui/NotificationManager.js';
         import { SettingsManager } from './js/ui/SettingsManager.js';
@@ -160,6 +159,7 @@
         import { AIAssistant } from './js/ui/AIAssistant.js';
         import { DebugUtils } from './js/utils/DebugUtils.js';
         import { CategoryManager } from './js/categorization/CategoryManager.js';
+        import { EnhancedTransactionUI } from './js/ui/EnhancedTransactionUI.js';
 
         // Main Application Class
         class ModularFinanceTracker {
@@ -168,6 +168,7 @@
                 this.authService = new AuthService();
                 this.dataService = new DataService(this.authService);
                 this.geminiService = new GeminiService();
+                this.categoryManager = new CategoryManager();
                 
                 // IMPORTANT: Pass dataService to EnhancedCSVImporter
                 this.csvImporter = new EnhancedCSVImporter(this.dataService, this.geminiService, this.categoryManager);
@@ -175,7 +176,7 @@
                 // Initialize other services
                 this.analytics = new AnalyticsEngine(this.dataService);
                 this.dashboard = new Dashboard(this.analytics);
-                this.ui = new TransactionUI(this.dataService, this);
+                this.ui = new EnhancedTransactionUI(this.dataService, this, this.categoryManager);
                 this.modal = new Modal(this);
                 this.enhancedDashboard = new EnhancedDashboard(this);
                 this.aiAssistant = new AIAssistant(this.dataService);
@@ -183,7 +184,6 @@
                 // Initialize UI managers
                 this.notificationManager = new NotificationManager();
                 this.settingsManager = new SettingsManager(this.geminiService);
-                this.categoryManager = new CategoryManager();
                 
                 // Initialize properties
                 this.accounts = [];
@@ -406,7 +406,7 @@
                         <h3 class="text-lg font-semibold mb-4">Recent Transactions</h3>
                         ${recentTxns.map(txn => `
                             <div class="border rounded p-3 hover:bg-gray-50 cursor-pointer"
-                                 onclick="financeApp.ui.openTransactionEditor(${JSON.stringify(txn).replace(/"/g, '&quot;')})">
+                                 onclick="financeApp.ui.editTransaction(${JSON.stringify(txn).replace(/"/g, '&quot;')})">
                                 <div class="flex justify-between">
                                     <div>
                                         <p class="font-medium">${txn.description}</p>
