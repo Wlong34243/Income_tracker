@@ -1,11 +1,15 @@
 // js/ui/SettingsManager.js
 // Settings page for API key management and app configuration
 
-import { geminiService } from '../ai/GeminiService.js';
+import { GeminiService } from '../ai/GeminiService.js';
 import { AppConfig } from '../config/AppConfig.js';
 
 export class SettingsManager {
-    constructor() {
+    constructor(geminiService) {
+        if (!geminiService) {
+            throw new Error("GeminiService instance is required.");
+        }
+        this.geminiService = geminiService;
         this.initializeUI();
     }
 
@@ -24,7 +28,7 @@ export class SettingsManager {
                     <div class="bg-gray-800 text-white p-4">
                         <div class="flex items-center justify-between">
                             <h2 class="text-xl font-semibold">Settings</h2>
-                            <button onclick="settingsManager.close()" class="text-white hover:text-gray-300">
+                            <button onclick="window.financeApp.settingsManager.close()" class="text-white hover:text-gray-300">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                 </svg>
@@ -34,11 +38,11 @@ export class SettingsManager {
                     <div class="flex h-[calc(90vh-8rem)]">
                         <!-- Sidebar -->
                         <div class="w-64 bg-gray-50 p-4 border-r">
-                            <button onclick="settingsManager.showSection('api-keys')"
+                            <button onclick="window.financeApp.settingsManager.showSection('api-keys')"
                                      class="w-full text-left px-3 py-2 rounded hover:bg-gray-200 mb-2 settings-section-btn active">
                                 API Keys
                             </button>
-                            <button onclick="settingsManager.showSection('import-export')"
+                            <button onclick="window.financeApp.settingsManager.showSection('import-export')"
                                      class="w-full text-left px-3 py-2 rounded hover:bg-gray-200 mb-2 settings-section-btn">
                                 Import/Export
                             </button>
@@ -62,17 +66,17 @@ export class SettingsManager {
                                                         id="geminiApiKeyInput"
                                                        placeholder="Enter your Gemini API key"
                                                        class="flex-1 px-3 py-2 border border-gray-300 rounded-md">
-                                                <button onclick="settingsManager.toggleApiKeyVisibility('geminiApiKeyInput')"
+                                                <button onclick="window.financeApp.settingsManager.toggleApiKeyVisibility('geminiApiKeyInput')"
                                                         class="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50">
                                                     👁️
                                                 </button>
                                             </div>
                                         </div>                                                                                <div class="flex space-x-2">
-                                            <button onclick="settingsManager.saveGeminiKey()"
+                                            <button onclick="window.financeApp.settingsManager.saveGeminiKey()"
                                                     class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
                                                 Save Key
                                             </button>
-                                            <button onclick="settingsManager.testGeminiKey()"
+                                            <button onclick="window.financeApp.settingsManager.testGeminiKey()"
                                                     class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
                                                 Test Connection
                                             </button>
@@ -85,7 +89,7 @@ export class SettingsManager {
                                     <div>
                                         <h4 class="font-medium mb-3">Clear All Data</h4>
                                         <p class="text-sm text-gray-600 mb-3">Remove all transactions and reset accounts</p>
-                                        <button onclick="settingsManager.clearAllData()"
+                                        <button onclick="window.financeApp.settingsManager.clearAllData()"
                                                 class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">
                                             Clear All Data
                                         </button>
@@ -103,10 +107,10 @@ export class SettingsManager {
 
     open() {
         // Auto-configure the API key if not already set
-        const existingApiKey = geminiService.getApiKey();
+        const existingApiKey = this.geminiService.getApiKey();
         if (!existingApiKey) {
             const defaultKey = 'AIzaSyA4lwOuimRwUXtSbChOmkkSa2zGv4RzrUI';
-            geminiService.setApiKey(defaultKey);
+            this.geminiService.setApiKey(defaultKey);
             console.log('Gemini API key has been auto-configured.');
         }
 
@@ -154,7 +158,7 @@ export class SettingsManager {
     }
 
     loadApiKeys() {
-        const apiKey = geminiService.getApiKey();
+        const apiKey = this.geminiService.getApiKey();
         const keyInput = document.getElementById('geminiApiKeyInput'); // Changed from 'geminiApiKey'
         const statusDiv = document.getElementById('geminiStatus');
             if (apiKey) {
@@ -207,14 +211,14 @@ export class SettingsManager {
             this.showNotification('Please enter the full API key', 'error');
             return;
         }
-        geminiService.setApiKey(key);
+        this.geminiService.setApiKey(key);
         this.loadApiKeys();
         this.showNotification('API key saved successfully', 'success');
     }
 
     async testGeminiKey() {
         const keyInput = document.getElementById('geminiApiKeyInput'); // Changed from 'geminiApiKey'
-        const apiKey = keyInput ? keyInput.value : geminiService.getApiKey();
+        const apiKey = keyInput ? keyInput.value : this.geminiService.getApiKey();
             if (!apiKey || apiKey.includes('•')) {
             this.showNotification('Please enter a valid API key first', 'error');
             return;
@@ -238,7 +242,7 @@ export class SettingsManager {
             if (response.ok) {
                 const data = await response.json();
                 const result = data.candidates[0].content.parts[0].text;
-                geminiService.setApiKey(apiKey);
+                this.geminiService.setApiKey(apiKey);
                 this.showNotification(`✅ API connected successfully! Test result: ${result}`, 'success');
                 this.loadApiKeys();
             } else {
@@ -255,7 +259,7 @@ export class SettingsManager {
     removeGeminiKey() {
         if (confirm('Are you sure you want to remove the API key?')) {
             localStorage.removeItem('gemini_api_key');
-            geminiService.apiKey = null;
+            this.geminiService.apiKey = null;
             this.loadApiKeys();
             this.showNotification('API key removed', 'info');
         }
@@ -482,6 +486,4 @@ export class SettingsManager {
     }
 }
 
-// Create singleton instance
-export const settingsManager = new SettingsManager();
-window.settingsManager = settingsManager;
+// The class is exported, to be instantiated in the main application.
