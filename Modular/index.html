@@ -158,8 +158,7 @@
         import { EnhancedDashboard } from './js/ui/EnhancedDashboard.js';
         import { AIAssistant } from './js/ui/AIAssistant.js';
         import { DebugUtils } from './js/utils/DebugUtils.js';
-        import { CategoryManager } from './js/categorization/CategoryManager.js';
-        import { EnhancedTransactionUI } from './js/ui/EnhancedTransactionUI.js';
+        import { CategoryIntegration } from './js/integration/CategoryIntegration.js';
 
         // Main Application Class
         class ModularFinanceTracker {
@@ -168,15 +167,11 @@
                 this.authService = new AuthService();
                 this.dataService = new DataService(this.authService);
                 this.geminiService = new GeminiService();
-                this.categoryManager = new CategoryManager();
+                this.categoryIntegration = new CategoryIntegration(this);
                 
-                // IMPORTANT: Pass dataService to EnhancedCSVImporter
-                this.csvImporter = new CategoryAwareCSVImporter(this.dataService, this.categoryManager);
-                
-                // Initialize other services
+                // Other services
                 this.analytics = new AnalyticsEngine(this.dataService);
                 this.dashboard = new Dashboard(this.analytics);
-                this.ui = new EnhancedTransactionUI(this.dataService, this, this.categoryManager);
                 this.modal = new Modal(this);
                 this.enhancedDashboard = new EnhancedDashboard(this);
                 this.aiAssistant = new AIAssistant(this.dataService);
@@ -195,7 +190,7 @@
             async init() {
                 // Initialize services that might have async setup
                 await this.geminiService.initialize();
-                await this.categoryManager.init();
+                await this.categoryIntegration.initialize();
 
                 // Firebase is already initialized outside the module
                 this.authService.onAuthStateChanged(user => {
