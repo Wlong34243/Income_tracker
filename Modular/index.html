@@ -6,9 +6,7 @@
     <title>Finance Tracker - Modular Architecture</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
-    
     <style>
-        /* Firebase SDKs are now loaded via JS modules */
         .csv-drop-zone.dragover { border-color: #3b82f6; background-color: #eff6ff; }
         .tab-content.hidden { display: none; }
         .modal-backdrop { background-color: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); }
@@ -18,21 +16,13 @@
             to { transform: translateX(0); opacity: 1; }
         }
         #transactionEditor { transition: transform 0.3s ease-out; }
-        /* Added CSS for import steps and confidence indicators */
-        .import-step { position: relative; cursor: pointer; transition: all 0.2s; }
-        .import-step.active-step { background-color: #EBF8FF; border-bottom: 2px solid #2563EB; }
-        .import-step:not(.active-step) { opacity: 0.6; }
-        .confidence-high { background-color: #D1FAE5; color: #065F46; }
-        .confidence-medium { background-color: #FEF3C7; color: #92400E; }
-        .confidence-low { background-color: #FEE2E2; color: #991B1B; }
-        #csvFile:focus + label { outline: 2px solid #3B82F6; outline-offset: 2px; }
-        .transaction-card { transition: all 0.2s; }
-        .transaction-card:hover { transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans">
     
-    <div id="authPanel" class="hidden">Authentication Panel Placeholder</div>
+    <div id="authContainer">
+        <!-- Auth UI will be rendered here by AuthService -->
+    </div>
 
     <div id="mainApp" class="hidden">
         <header class="bg-white shadow-md">
@@ -40,424 +30,163 @@
                 <div class="flex justify-between items-center py-4">
                     <div>
                         <h1 class="text-2xl font-bold text-gray-900">Finance Tracker</h1>
-                        <div class="text-green-600 font-medium text-sm">🏠 Real Estate & Tech Business Analytics</div>
                     </div>
-                    <div class="flex items-center space-x-4">
-                        <button id="importTransactionsBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition flex items-center gap-2 text-sm">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-                            </svg>
-                            Import Transactions
-                        </button>
-                        <button id="addTransactionBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2 text-sm">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                            Add Transaction
-                        </button>
-                        <button id="updateBalancesBtn" class="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition flex items-center gap-2 text-sm">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            Update Balances
-                        </button>
+                    <div id="header-buttons" class="flex items-center space-x-4">
+                        <button id="importTransactionsBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition flex items-center gap-2 text-sm">Import</button>
+                        <button id="addTransactionBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2 text-sm">Add</button>
                         <span id="userInfo" class="text-sm text-gray-600"></span>
                         <button id="logoutBtn" class="bg-red-600 text-white px-4 py-2 rounded-lg">Logout</button>
                     </div>
                 </div>
             </div>
         </header>
-        <div id="transactionsList" class="p-6">Transactions will be listed here.</div>
+        <main class="p-6">
+            <div id="dashboard-container"></div>
+            <div id="transactions-container" class="mt-6"></div>
+        </main>
     </div>
 
-    <div id="transactionModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-        <div class="modal-backdrop fixed inset-0"></div>
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full">
-                <div class="flex items-center justify-between p-4 border-b">
-                    <h3 class="text-lg font-semibold text-gray-900">Add Transaction</h3>
-                    <button onclick="window.financeApp.ui.closeTransactionModal()" class="text-gray-400 hover:text-gray-600">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                    </button>
-                </div>
-                <form id="transactionForm" class="p-4 space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Date</label><input type="date" id="transactionDate" required class="w-full px-3 py-2 border border-gray-300 rounded-md"></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Amount</label><input type="number" id="transactionAmount" step="0.01" required placeholder="0.00" class="w-full px-3 py-2 border border-gray-300 rounded-md"></div>
-                    </div>
-                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Description</label><input type="text" id="transactionDescription" required class="w-full px-3 py-2 border border-gray-300 rounded-md"></div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Account</label><select id="transactionAccount" required class="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="">Select Account</option></select></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Category</label><select id="transactionCategory" required class="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="">Select Category</option></select></div>
-                    </div>
-                    <div class="flex items-center space-x-2"><input type="checkbox" id="isTransfer" class="rounded border-gray-300"><label for="isTransfer" class="text-sm text-gray-700">This is a transfer</label></div>
-                    <div id="transferAccountDiv" class="hidden"><label class="block text-sm font-medium text-gray-700 mb-1">Transfer To Account</label><select id="transferAccount" class="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="">Select Transfer Account</option></select></div>
-                    <div id="propertyDiv" class="hidden"><label class="block text-sm font-medium text-gray-700 mb-1">Property</label><select id="transactionProperty" class="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="">Select Property</option></select></div>
-                    <div class="flex justify-end space-x-3 pt-4">
-                        <button type="button" onclick="window.financeApp.ui.closeTransactionModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md">Cancel</button>
-                        <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md">Add Transaction</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    <div id="accountBalanceModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-        <div class="modal-backdrop fixed inset-0"></div>
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full">
-                <div class="flex items-center justify-between p-4 border-b">
-                    <h3 class="text-lg font-semibold text-gray-900">Update Account Balance</h3>
-                    <button onclick="window.financeApp.ui.closeAccountModal()" class="text-gray-400 hover:text-gray-600">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                    </button>
-                </div>
-                <form id="accountBalanceForm" class="p-4 space-y-4">
-                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Account</label><select id="balanceAccount" required class="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="">Select Account</option></select></div>
-                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Current Balance</label><input type="number" id="currentBalance" step="0.01" required placeholder="0.00" class="w-full px-3 py-2 border border-gray-300 rounded-md"></div>
-                    <div class="flex justify-end space-x-3 pt-4">
-                        <button type="button" onclick="window.financeApp.ui.closeAccountModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md">Cancel</button>
-                        <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md">Update Balance</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    <div id="transactionEditor" class="hidden fixed right-0 top-0 h-full w-96 bg-white shadow-2xl z-40 overflow-y-auto slide-in">
-        <div class="sticky top-0 bg-white border-b p-4">
-            <div class="flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-gray-900">Edit Transaction</h3>
-                <button onclick="window.financeApp.ui.closeTransactionEditor()" class="text-gray-400 hover:text-gray-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
-            </div>
-        </div>
-        <form id="editTransactionForm" class="p-4 space-y-4">
-            <input type="hidden" id="editTransactionId">
-            <div class="bg-gray-50 p-3 rounded-md"><p class="text-sm text-gray-600">Original Description:</p><p id="originalDescription" class="font-medium text-gray-900 mt-1"></p></div>
-            <div><label class="block text-sm font-medium text-gray-700 mb-1">Category</label><select id="editCategory" required class="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="">Select Category</option></select></div>
-            <div id="editPropertyDiv"><label class="block text-sm font-medium text-gray-700 mb-1">Property</label><select id="editProperty" class="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="">No Property</option></select></div>
-            <div><label class="block text-sm font-medium text-gray-700 mb-1">Notes</label><textarea id="editNotes" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md"></textarea></div>
-            <div class="flex justify-end space-x-3 pt-4">
-                <button type="button" onclick="window.financeApp.ui.closeTransactionEditor()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md">Cancel</button>
-                <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md">Save Changes</button>
-            </div>
-        </form>
-    </div>
+    <!-- Modals and Side Panels will be managed by their respective UI components -->
+    <div id="modal-container"></div>
+    <div id="editor-container"></div>
+    <div id="notification-container" class="fixed bottom-5 right-5 z-50"></div>
 
     <script type="module">
-        // V9 Firebase Imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
         import { getAuth } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
         import { getFirestore } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-        // Import modules
+        // Configuration
         import { AppConfig } from './js/config/AppConfig.js';
+
+        // Core Services
         import { AuthService } from './js/auth/AuthService.js';
         import { DataService } from './js/data/DataService.js';
         import { GeminiService } from './js/ai/GeminiService.js';
-        import { CategoryAwareCSVImporter } from './js/import/CategoryAwareCSVImporter.js';
-        import { AnalyticsEngine } from './js/analytics/AnalyticsEngine.js';
-        import { Dashboard } from './js/ui/Dashboard.js';
-        import { Modal } from './js/ui/Modal.js';
+
+        // UI Components
+        import { UIManager } from './js/ui/UIManager.js';
+        import { SettingsManager } from './js/settings/SettingsManager.js';
         import { NotificationManager } from './js/ui/NotificationManager.js';
-        import { SettingsManager } from './js/ui/SettingsManager.js';
-        import { EnhancedDashboard } from './js/ui/EnhancedDashboard.js';
-        import { AIAssistant } from './js/ui/AIAssistant.js';
-        import { DebugUtils } from './js/utils/DebugUtils.js';
+
+        // Main Integration Layer
         import { CategoryIntegration } from './js/integration/CategoryIntegration.js';
 
-        // Main Application Class
-        class ModularFinanceTracker {
-            constructor(firebaseApp) {
-                const auth = getAuth(firebaseApp);
-                const firestore = getFirestore(firebaseApp);
-
-                // Initialize core services
-                this.authService = new AuthService(); // Now initializes itself with getAuth()
-                this.dataService = new DataService(this.authService, firestore);
-                this.categoryIntegration = new CategoryIntegration(this);
-                this.geminiService = new GeminiService(this.categoryIntegration.categoryManager);
-                
-                // Other services
-                this.analytics = new AnalyticsEngine(this.dataService);
-                this.dashboard = new Dashboard(this.analytics);
-                this.modal = new Modal(this);
-                this.enhancedDashboard = new EnhancedDashboard(this);
-                this.aiAssistant = new AIAssistant(this.dataService, this.categoryIntegration.categoryManager);
-                
-                // Initialize UI managers
-                this.notificationManager = new NotificationManager();
-                this.settingsManager = new SettingsManager(this.geminiService, this.categoryIntegration.categoryManager);
-                
-                // Initialize properties
-                this.accounts = [];
+        class App {
+            constructor(authService, dataService, uiManager, categoryIntegration, settingsManager) {
+                this.authService = authService;
+                this.dataService = dataService;
+                this.uiManager = uiManager;
+                this.categoryIntegration = categoryIntegration;
+                this.settingsManager = settingsManager;
                 this.transactions = [];
-                
-                this.init();
+                this.accounts = [];
             }
 
             async init() {
-                // Initialize services that might have async setup
-                await this.geminiService.initialize();
-                await this.categoryIntegration.initialize();
+                this.uiManager.init(this);
+                this.settingsManager.init(this.uiManager);
 
-                this.authService.onAuthStateChanged(user => {
+                this.authService.onAuthStateChanged(async (user) => {
                     if (user) {
-                        this.handleAuthSuccess(user);
+                        this.uiManager.showMainApp(user);
+                        await this.loadDataAndRender();
                     } else {
-                        this.showAuthPanel();
+                        this.uiManager.showAuth();
                     }
                 });
-                this.setupEventListeners();
-                this.addSettingsButton();
-                this.addManagementButtons(); // Call the new method
-            }
-            
-            addSettingsButton() {
-                // Add settings button to header
-                const headerButtons = document.querySelector('.flex.items-center.space-x-4');
-                if (headerButtons) {
-                    const settingsBtn = document.createElement('button');
-                    settingsBtn.id = 'settingsBtn';
-                    settingsBtn.className = 'text-gray-600 hover:text-gray-800';
-                    settingsBtn.innerHTML = `
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                        </svg>
-                    `;
-                    // Insert before logout button
-                    const logoutBtn = document.getElementById('logoutBtn');
-                    headerButtons.insertBefore(settingsBtn, logoutBtn);
-                }
-            }
-            
-            addManagementButtons() {
-                // Add buttons for enhanced functionality
-                const headerButtons = document.querySelector('.flex.items-center.space-x-4');
-                if (headerButtons) {
-                    // Add Enhanced Dashboard button
-                    const dashBtn = document.createElement('button');
-                    dashBtn.innerHTML = `📊 Enhanced Dashboard`;
-                    dashBtn.onclick = () => this.showEnhancedDashboard();
-                    dashBtn.className = 'bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition text-sm';
-                    
-                    // Insert before settings button
-                    const settingsBtn = document.getElementById('settingsBtn');
-                    if (settingsBtn) {
-                        headerButtons.insertBefore(dashBtn, settingsBtn);
-                    } else {
-                        // If no settings button, insert before logout
-                        const logoutBtn = document.getElementById('logoutBtn');
-                        headerButtons.insertBefore(dashBtn, logoutBtn);
-                    }
-                }
-            }
-            
-            async handleAuthSuccess(user) {
-                console.log("User authenticated:", user.uid);
-                document.getElementById('authPanel').classList.add('hidden');
-                document.getElementById('mainApp').classList.remove('hidden');
-                
-                // Update user info
-                const userInfo = document.getElementById('userInfo');
-                if (userInfo) {
-                    userInfo.textContent = user.email || 'User';
-                }
-                
-                // Load initial data
-                await this.loadInitialData();
-                await this.updateAllViews();
             }
 
-            showAuthPanel() {
-                console.log("Showing auth panel...");
-                document.getElementById('authPanel').classList.remove('hidden');
-                document.getElementById('mainApp').classList.add('hidden');
-            }
-
-            setupEventListeners() {
-                // Use arrow functions to preserve 'this' context
-                document.getElementById('importTransactionsBtn')?.addEventListener('click', () => {
-                    this.csvImporter.openModal();
-                });
-                
-                document.getElementById('addTransactionBtn')?.addEventListener('click', () => {
-                    this.ui.openTransactionModal();
-                });
-                
-                document.getElementById('updateBalancesBtn')?.addEventListener('click', () => {
-                    this.ui.openAccountModal();
-                });
-                
-                document.getElementById('logoutBtn')?.addEventListener('click', () => {
-                    this.authService.signOut();
-                });
-
-                document.getElementById('settingsBtn')?.addEventListener('click', () => {
-                    this.settingsManager.open();
-                });
-            }
-
-            async loadInitialData() {
-                console.log("Loading initial data...");
+            async loadDataAndRender() {
                 try {
-                    // Load accounts
-                    this.accounts = await this.dataService.loadAccounts();
-                    console.log(`Loaded ${this.accounts.length} accounts`);
+                    [this.accounts, this.transactions] = await Promise.all([
+                        this.dataService.loadAccounts(),
+                        this.dataService.loadTransactions()
+                    ]);
                     
-                    // Load transactions
-                    this.transactions = await this.dataService.loadTransactions();
-                    console.log(`Loaded ${this.transactions.length} transactions`);
+                    console.log(`Loaded ${this.accounts.length} accounts and ${this.transactions.length} transactions.`);
                     
-                    // Initialize account balances if needed
-                    if (this.accounts.length === 0) {
-                        await this.initializeDefaultAccounts();
-                    }
+                    this.uiManager.renderDashboard(this.transactions, this.accounts);
+                    this.uiManager.renderTransactionList(this.transactions);
+
                 } catch (error) {
-                    console.error("Error loading initial data:", error);
-                    this.showNotification("Error loading data", "error");
+                    console.error("Failed to load data and render:", error);
+                    this.uiManager.showNotification("Error loading application data.", "error");
                 }
             }
 
-            async initializeDefaultAccounts() {
-                console.log("Initializing default accounts...");
-                const defaultAccounts = Object.entries(AppConfig.ACCOUNT_MAPPING).map(([id, data]) => ({
-                    id: id,
-                    name: data.name,
-                    type: data.type,
-                    entity: data.entity,
-                    balance: 0
-                }));
-                
-                for (const account of defaultAccounts) {
-                    await this.dataService.saveAccount(account);
+            async addTransaction(data) {
+                const newTransaction = await this.dataService.addTransaction(data);
+                this.transactions.unshift(newTransaction);
+                this.uiManager.renderTransactionList(this.transactions);
+                this.uiManager.showNotification("Transaction added successfully.", "success");
+            }
+
+            async updateTransaction(data) {
+                const updatedTransaction = await this.dataService.updateTransaction(data.id, data);
+                const index = this.transactions.findIndex(t => t.id === data.id);
+                if (index !== -1) {
+                    this.transactions[index] = updatedTransaction;
                 }
-                
-                this.accounts = defaultAccounts;
+                this.uiManager.renderTransactionList(this.transactions);
+                this.uiManager.showNotification("Transaction updated.", "success");
             }
 
-            async refreshDataAndViews() {
-                console.log("Refreshing data and views...");
-                
-                try {
-                    // Reload data from storage
-                    await this.loadInitialData();
-                    
-                    // Refresh dashboard if it exists
-                    if (this.dashboard && this.dashboard.update) {
-                        this.dashboard.update(this.transactions, this.accounts);
-                    }
-                    
-                    // Refresh enhanced dashboard if available
-                    if (this.enhancedDashboard && this.enhancedDashboard.refresh) {
-                        await this.enhancedDashboard.refresh();
-                    }
-                    
-                    // Update analytics if available
-                    if (this.analytics && this.analytics.refresh) {
-                        await this.analytics.refresh();
-                    }
-                    
-                    // Update the transaction list in the UI if visible
-                    if (this.ui && this.ui.updateTransactionList) {
-                        this.ui.updateTransactionList(this.transactions);
-                    }
-                    
-                    console.log("✅ Data and views refreshed successfully");
-                } catch (error) {
-                    console.error("Error refreshing data and views:", error);
-                    this.showNotification("Error refreshing data", "error");
+            async deleteTransaction(id) {
+                 await this.dataService.deleteTransaction(id);
+                 this.transactions = this.transactions.filter(t => t.id !== id);
+                 this.uiManager.renderTransactionList(this.transactions);
+                 this.uiManager.showNotification("Transaction deleted.", "error");
+            }
+
+            importTransactions(data) {
+                // This is a simplified view. The CSV importer from the integration layer will handle the details
+                const importer = this.categoryIntegration.csvImporter;
+                if (importer) {
+                    // In a real scenario, you'd pass the data to the importer and it would
+                    // call back to the app to add the transactions.
+                    console.log("Transaction import process started by UI manager.");
                 }
-            }
-
-            async updateAllViews() {
-                console.log("Updating all views...");
-                try {
-                    // Update dashboard if we have data
-                    if (this.dashboard && this.transactions.length > 0) {
-                        await this.dashboard.updateDashboard(this.transactions, this.accounts);
-                    }
-                    
-                    // Display transactions list
-                    this.displayTransactions(this.transactions);
-                } catch (error) {
-                    console.error("Error updating views:", error);
-                }
-            }
-
-            displayTransactions(transactions) {
-                const container = document.getElementById('transactionsList');
-                if (!container) return;
-                
-                if (transactions.length === 0) {
-                    container.innerHTML = `
-                        <div class="text-center py-8">
-                            <p class="text-gray-500 mb-4">No transactions yet</p>
-                            <button onclick="financeApp.csvImporter.openModal()" 
-                                    class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-                                Import Transactions
-                            </button>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                // Display recent transactions
-                const recentTxns = transactions.slice(0, 10);
-                container.innerHTML = `
-                    <div class="space-y-2">
-                        <h3 class="text-lg font-semibold mb-4">Recent Transactions</h3>
-                        ${recentTxns.map(txn => `
-                            <div class="border rounded p-3 hover:bg-gray-50 cursor-pointer"
-                                 onclick="financeApp.ui.editTransaction(${JSON.stringify(txn).replace(/"/g, '&quot;')})">
-                                <div class="flex justify-between">
-                                    <div>
-                                        <p class="font-medium">${txn.description}</p>
-                                        <p class="text-sm text-gray-600">
-                                            ${txn.date} • ${txn.category || 'Uncategorized'}
-                                        </p>
-                                    </div>
-                                    <div class="text-right">
-                                        <p class="font-medium ${txn.amount < 0 ? 'text-red-600' : 'text-green-600'}">
-                                            ${txn.amount < 0 ? '-' : '+'}$${Math.abs(txn.amount).toFixed(2)}
-                                        </p>
-                                        <p class="text-sm text-gray-600">${txn.account}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
-            }
-
-            showNotification(message, type) {
-                // Use the notification manager
-                this.notificationManager.show(message, type);
-            }
-
-            // Method called by TransactionUI
-            getEntityForAccount(accountId) {
-                const mapping = AppConfig.ACCOUNT_MAPPING[accountId];
-                return mapping ? mapping.entity : 'Personal';
-            }
-            
-            showEnhancedDashboard() {
-                this.enhancedDashboard.show();
             }
         }
 
-        // Initialize on DOM ready
-        document.addEventListener('DOMContentLoaded', () => {
-            // Use the config from AppConfig
+        async function main() {
+            // 1. Initialize Firebase
             const firebaseApp = initializeApp(AppConfig.FIREBASE_CONFIG);
+            const auth = getAuth(firebaseApp);
+            const firestore = getFirestore(firebaseApp);
 
-            window.financeApp = new ModularFinanceTracker(firebaseApp);
-            // Expose managers for onclick handlers
-            window.csvImporter = window.financeApp.csvImporter;
-            window.settingsManager = window.financeApp.settingsManager;
-            window.notificationManager = window.financeApp.notificationManager;
-        });
+            // 2. Instantiate Core Services
+            const notificationManager = new NotificationManager();
+            const authService = new AuthService(auth);
+            const dataService = new DataService(authService, firestore);
+            const geminiService = new GeminiService(AppConfig.GEMINI_API_KEY); // Using key from config
+            await geminiService.initialize();
+
+            // 3. Instantiate UI and Integration Layers
+            const settingsManager = new SettingsManager(geminiService);
+            const categoryIntegration = new CategoryIntegration(dataService, AppConfig, {
+                ui: { showNotification: notificationManager.show.bind(notificationManager) }
+            });
+            const integrationServices = await categoryIntegration.initialize();
+
+            const uiManager = new UIManager({
+                ...integrationServices,
+                settingsManager,
+                notificationManager,
+                authService
+            });
+
+            // 4. Create and Initialize the Main App
+            const app = new App(authService, dataService, uiManager, integrationServices, settingsManager);
+            await app.init();
+
+            console.log("Finance Tracker Initialized");
+        }
+
+        // Run the app
+        main().catch(console.error);
+
     </script>
-    
-    <script src="https://unpkg.com/@google/generative-ai/dist/index.umd.js"></script>
 </body>
 </html>

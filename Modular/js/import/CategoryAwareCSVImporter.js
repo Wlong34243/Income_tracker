@@ -1125,5 +1125,4 @@ export class CategoryAwareCSVImporter {
     }
 }
 
-// Make globally available for integration
-window.CategoryAwareCSVImporter = CategoryAwareCSVImporter;
+// No longer needs to be global
