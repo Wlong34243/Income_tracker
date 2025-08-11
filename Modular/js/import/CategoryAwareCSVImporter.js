@@ -17,6 +17,112 @@ export class CategoryAwareCSVImporter {
         };
     }
 
+    // ===== START: NEW METHODS TO FIX BROKEN IMPORTER =====
+
+    detectCSVFormat(filename, headers) {
+        // Chase Checking format
+        if (headers.includes('Details') && headers.includes('Posting Date')) {
+            return 'CHASE_CHECKING';
+        }
+        // Chase Credit Card format
+        if (headers.includes('Transaction Date') && headers.includes('Category')) {
+            return 'CHASE_CREDIT';
+        }
+        // Investment format
+        if (headers.includes('Trade Date') && headers.includes('Ticker')) {
+            return 'INVESTMENT';
+        }
+        return 'UNKNOWN';
+    }
+
+    parseDate(dateStr) {
+        if (!dateStr) return new Date().toISOString().split('T')[0];
+        // Handles MM/DD/YYYY and M/D/YYYY
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+            const [month, day, year] = parts;
+            // Handles both YY and YYYY years
+            const fullYear = year.length === 2 ? `20${year}` : year;
+            const date = new Date(fullYear, month - 1, day);
+            if (!isNaN(date.getTime())) {
+                return date.toISOString().split('T')[0];
+            }
+        }
+        // Fallback for other formats like YYYY-MM-DD
+        const date = new Date(dateStr);
+        return isNaN(date.getTime()) ? new Date().toISOString().split('T')[0] : date.toISOString().split('T')[0];
+    }
+
+    normalizeTransactionData(data, accountId) {
+        if (!data.length) return [];
+
+        const headers = Object.keys(data[0]);
+        const format = this.detectCSVFormat(accountId, headers); // filename can give hints too
+
+        const FIELD_MAPPINGS = {
+            CHASE_CHECKING: { date: 'Posting Date', description: 'Description', amount: 'Amount', type: 'Type' },
+            CHASE_CREDIT: { date: 'Transaction Date', description: 'Description', amount: 'Amount', type: 'Type' },
+            INVESTMENT: { date: 'Trade Date', description: 'Description', amount: 'Amount USD', ticker: 'Ticker' }
+        };
+
+        const mapping = FIELD_MAPPINGS[format];
+        if (!mapping) {
+            console.warn("Unknown CSV format, attempting generic mapping.");
+            // A generic mapping could be attempted here if needed
+            return [];
+        }
+
+        return data.map(row => {
+            let amount = parseFloat(row[mapping.amount]) || 0;
+
+            // Handle amount sign conventions
+            if (format === 'CHASE_CREDIT') {
+                // Payments are negative, charges are positive in source, but we want charges to be negative expenses.
+                amount = -amount;
+            }
+
+            const transaction = {
+                date: this.parseDate(row[mapping.date]),
+                description: row[mapping.description],
+                amount: amount,
+                accountId: accountId,
+                originalData: row,
+                type: row[mapping.type] || (amount > 0 ? 'Income' : 'Expense')
+            };
+
+            // Detect transfers
+            const typeField = (row[mapping.type] || '').toLowerCase();
+            if (typeField.includes('online transfer') || typeField.includes('acct_xfer')) {
+                transaction.type = 'Transfer';
+            }
+
+            return transaction;
+        }).filter(t => t.amount !== 0); // Filter out zero-amount transactions
+    }
+
+    transactionsMatch(t1, t2) {
+        if (!t1 || !t2) return false;
+        const sameDate = new Date(t1.date).toDateString() === new Date(t2.date).toDateString();
+        const sameAmount = Math.abs(t1.amount - t2.amount) < 0.01;
+        const sameDescription = t1.description.toLowerCase().trim() === t2.description.toLowerCase().trim();
+        return sameDate && sameAmount && sameDescription;
+    }
+
+    async findDuplicates(transactions) {
+        const existingTransactions = await this.dataService.getAllTransactions();
+        if (existingTransactions.length === 0) return [];
+
+        const duplicates = [];
+        for (const transaction of transactions) {
+            if (existingTransactions.some(existing => this.transactionsMatch(transaction, existing))) {
+                duplicates.push(transaction);
+            }
+        }
+        return duplicates;
+    }
+
+    // ===== END: NEW METHODS =====
+
     // Enhanced processCSV method with categorization
     async processCSV(file, accountId) {
         try {

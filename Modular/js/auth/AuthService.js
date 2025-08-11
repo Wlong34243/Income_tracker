@@ -3,86 +3,41 @@
 
 import { AppConfig } from '../config/AppConfig.js';
 
+import {
+    getAuth,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword,
+    signOut
+} from "firebase/auth";
+
 export class AuthService {
     constructor() {
         this.currentUser = null;
         this.onStateChangeCallbacks = [];
-        this.auth = null;
-        this.db = null;
-        
-        this.initializeAuth();
+        this.auth = getAuth();
+        this._listenToAuthState();
     }
-    
-    initializeAuth() {
-        if (AppConfig.DEMO_MODE) {
-            this.setupDemoAuth();
-        } else {
-            this.setupFirebaseAuth();
-        }
-    }
-    
-    setupDemoAuth() {
-        console.log('🔧 Initializing Demo Authentication');
-        
-        this.auth = {
-            onAuthStateChanged: (callback) => {
-                setTimeout(() => {
-                    const demoUser = { 
-                        uid: 'demo-user', 
-                        email: 'demo@example.com',
-                        displayName: 'Demo User'
-                    };
-                    callback(demoUser);
-                }, 100);
-            },
-            
-            signInWithEmailAndPassword: (email, password) => {
-                return Promise.resolve({ 
-                    uid: 'demo-user', 
-                    email: email,
-                    displayName: 'Demo User'
-                });
-            },
-            
-            createUserWithEmailAndPassword: (email, password) => {
-                return Promise.resolve({ 
-                    uid: 'demo-user', 
-                    email: email,
-                    displayName: 'Demo User'
-                });
-            },
-            
-            signOut: () => {
-                localStorage.clear();
-                setTimeout(() => location.reload(), 100);
-                return Promise.resolve();
-            }
-        };
-    }
-    
-    setupFirebaseAuth() {
-        console.log('🔧 Initializing Firebase Authentication');
-        
-        if (typeof firebase === 'undefined') {
-            throw new Error('Firebase not loaded. Please include Firebase SDK.');
-        }
-        
-        firebase.initializeApp(AppConfig.FIREBASE_CONFIG);
-        this.auth = firebase.auth();
-        this.db = firebase.firestore();
+
+    _listenToAuthState() {
+        onAuthStateChanged(this.auth, (user) => {
+            this.currentUser = user;
+            this.onStateChangeCallbacks.forEach(cb => cb(user));
+        });
     }
     
     onAuthStateChanged(callback) {
         this.onStateChangeCallbacks.push(callback);
-        this.auth.onAuthStateChanged((user) => {
-            this.currentUser = user;
-            callback(user);
-        });
+        // The listener is already active, so we might need to immediately call back
+        // if the user is already authenticated.
+        if (this.currentUser) {
+            callback(this.currentUser);
+        }
     }
     
     async signIn(email, password) {
         try {
-            const result = await this.auth.signInWithEmailAndPassword(email, password);
+            const result = await signInWithEmailAndPassword(this.auth, email, password);
             console.log('✅ User signed in:', result.user.email);
             return result;
         } catch (error) {
@@ -93,7 +48,7 @@ export class AuthService {
     
     async signUp(email, password) {
         try {
-            const result = await this.auth.createUserWithEmailAndPassword(email, password);
+            const result = await createUserWithEmailAndPassword(this.auth, email, password);
             console.log('✅ User created:', result.user.email);
             return result;
         } catch (error) {
@@ -104,7 +59,7 @@ export class AuthService {
     
     async signOut() {
         try {
-            await this.auth.signOut();
+            await signOut(this.auth);
             console.log('✅ User signed out');
         } catch (error) {
             console.error('❌ Sign out error:', error);
@@ -114,10 +69,6 @@ export class AuthService {
     
     getCurrentUser() {
         return this.currentUser;
-    }
-    
-    getDatabase() {
-        return this.db;
     }
     
     getAuthErrorMessage(errorCode) {

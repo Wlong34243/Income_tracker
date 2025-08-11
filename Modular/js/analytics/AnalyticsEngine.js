@@ -2,6 +2,7 @@
 // Business Intelligence for Real Estate and Tech Business
 
 import { AppConfig } from '../config/AppConfig.js';
+import { DateUtils } from '../utils/DateUtils.js';
 
 export class AnalyticsEngine {
     constructor(dataService) {
@@ -14,9 +15,9 @@ export class AnalyticsEngine {
         const targetYear = year ?? now.getFullYear();
         
         const monthlyTransactions = transactions.filter(t => {
-            const date = new Date(t.date.seconds * 1000);
-            return date.getMonth() === targetMonth && 
-                   date.getFullYear() === targetYear &&
+            const date = new Date(DateUtils.parseToYYYYMMDD(t.date));
+            return date.getUTCMonth() === targetMonth &&
+                   date.getUTCFullYear() === targetYear &&
                    t.category !== 'Internal Transfer'; // Exclude internal transfers
         });
         

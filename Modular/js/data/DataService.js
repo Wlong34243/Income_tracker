@@ -2,19 +2,12 @@
 // Data Persistence Layer - Firestore/LocalStorage Abstraction
 
 import { AppConfig } from '../config/AppConfig.js';
+import { serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
 export class DataService {
-    constructor(authService) {
+    constructor(authService, firestore) {
         this.authService = authService;
-        this.db = authService.getDatabase();
-        this.cache = new Map();
-    }
-
-    // Also add this static method that the importer is trying to call
-    static async getTransactions() {
-        // This needs to be reworked - static methods can't access instance data
-        console.warn("Static getTransactions called - this needs refactoring");
-        return [];
+        this.db = firestore;
     }
 
     async loadAccounts() {
@@ -59,7 +52,7 @@ export class DataService {
             userId: this.authService.getCurrentUser().uid,
             createdAt: AppConfig.DEMO_MODE ?
                 new Date().toISOString() :
-                firebase.firestore.FieldValue.serverTimestamp()
+                serverTimestamp()
         };
 
         if (AppConfig.DEMO_MODE) {
@@ -132,7 +125,7 @@ export class DataService {
                 const docRef = this.db.collection('transactions').doc(transactionId);
                 await docRef.update({
                     ...updates,
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    updatedAt: serverTimestamp()
                 });
             }
         } catch (error) {
@@ -157,7 +150,7 @@ export class DataService {
                 const docRef = this.db.collection('accounts').doc(accountId);
                 await docRef.set({
                     balance: balance,
-                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                    lastUpdated: serverTimestamp()
                 }, { merge: true }); // Use merge to update or create
             }
         } catch (error) {
@@ -185,7 +178,7 @@ export class DataService {
         const docRef = await this.db.collection('accounts').add({
             ...account,
             userId: this.authService.getCurrentUser().uid,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            createdAt: serverTimestamp()
         });
 
         return { id: docRef.id, ...account };
@@ -219,7 +212,7 @@ export class DataService {
                 batch.set(docRef, {
                     ...trans,
                     userId: this.authService.getCurrentUser().uid,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    createdAt: serverTimestamp()
                 });
                 results.success++;
             } catch (error) {
