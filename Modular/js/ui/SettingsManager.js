@@ -5,11 +5,15 @@ import { GeminiService } from '../ai/GeminiService.js';
 import { AppConfig } from '../config/AppConfig.js';
 
 export class SettingsManager {
-    constructor(geminiService) {
+    constructor(geminiService, categoryManager) {
         if (!geminiService) {
             throw new Error("GeminiService instance is required.");
         }
+        if (!categoryManager) {
+            throw new Error("CategoryManager instance is required.");
+        }
         this.geminiService = geminiService;
+        this.categoryManager = categoryManager;
         this.initializeUI();
     }
 
@@ -106,14 +110,6 @@ export class SettingsManager {
 }
 
     open() {
-        // Auto-configure the API key if not already set
-        const existingApiKey = this.geminiService.getApiKey();
-        if (!existingApiKey) {
-            const defaultKey = 'AIzaSyA4lwOuimRwUXtSbChOmkkSa2zGv4RzrUI';
-            this.geminiService.setApiKey(defaultKey);
-            console.log('Gemini API key has been auto-configured.');
-        }
-
         document.getElementById('settingsModal').classList.remove('hidden');
         this.loadApiKeys();
         this.loadAccounts();
@@ -297,11 +293,14 @@ export class SettingsManager {
         const incomeList = document.getElementById('incomeCategoriesList');
         const expenseList = document.getElementById('expenseCategoriesList');
         
-        if (incomeList && AppConfig.INCOME_CATEGORIES) {
-            incomeList.innerHTML = AppConfig.INCOME_CATEGORIES.map(cat => `
+        const allCategories = this.categoryManager.categories;
+
+        if (incomeList) {
+            const incomeCats = allCategories.filter(c => c.category === 'Income');
+            incomeList.innerHTML = incomeCats.map(cat => `
                 <div class="flex justify-between items-center p-2 bg-white border rounded">
-                    <span>${cat}</span>
-                    <button onclick="settingsManager.removeCategory('income', '${cat}')"
+                    <span>${cat.subcategory}</span>
+                    <button onclick="settingsManager.removeCategory('income', '${cat.id}')"
                             class="text-red-600 hover:text-red-800">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -311,11 +310,12 @@ export class SettingsManager {
             `).join('');
         }
         
-        if (expenseList && AppConfig.EXPENSE_CATEGORIES) {
-            expenseList.innerHTML = AppConfig.EXPENSE_CATEGORIES.map(cat => `
+        if (expenseList) {
+            const expenseCats = allCategories.filter(c => c.category !== 'Income' && c.category !== 'Transfers');
+            expenseList.innerHTML = expenseCats.map(cat => `
                 <div class="flex justify-between items-center p-2 bg-white border rounded">
-                    <span>${cat}</span>
-                    <button onclick="settingsManager.removeCategory('expense', '${cat}')"
+                    <span>${cat.category} / ${cat.subcategory}</span>
+                    <button onclick="settingsManager.removeCategory('expense', '${cat.id}')"
                             class="text-red-600 hover:text-red-800">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>

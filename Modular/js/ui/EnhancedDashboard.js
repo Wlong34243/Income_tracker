@@ -1,6 +1,8 @@
 // js/ui/EnhancedDashboard.js
 // Vanilla JavaScript version that integrates with your modular app
 
+import { DateUtils } from '../utils/DateUtils.js';
+
 export class EnhancedDashboard {
     constructor(financeApp) {
         this.financeApp = financeApp;
@@ -346,8 +348,8 @@ export class EnhancedDashboard {
         const currentYear = new Date().getFullYear();
         
         const monthlyTransactions = transactions.filter(t => {
-            const txDate = new Date(t.date);
-            return txDate.getMonth() === currentMonth && txDate.getFullYear() === currentYear;
+            const date = new Date(DateUtils.parseToYYYYMMDD(t.date));
+            return date.getUTCMonth() === currentMonth && date.getUTCFullYear() === currentYear;
         });
 
         // Real Estate Summary
@@ -486,7 +488,7 @@ export class EnhancedDashboard {
                     <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
                         <div>
                             <div class="font-medium text-sm">${t.description}</div>
-                            <div class="text-xs text-gray-500">${new Date(t.date).toLocaleDateString()}</div>
+                            <div class="text-xs text-gray-500">${DateUtils.formatDate(t.date)}</div>
                         </div>
                         <div class="text-right">
                             <div class="font-bold ${t.amount >= 0 ? 'text-green-600' : 'text-red-600'}">

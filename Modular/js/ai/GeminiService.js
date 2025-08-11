@@ -4,7 +4,8 @@
 import { AppConfig } from '../config/AppConfig.js';
 
 class GeminiService {
-    constructor() {
+    constructor(categoryManager) {
+        this.categoryManager = categoryManager;
         this.apiKey = this.getApiKey(); // Get from localStorage initially
         this.apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
         this.transactionHistory = [];
@@ -63,7 +64,7 @@ class GeminiService {
     }
 
     async aiCategorize(transaction) {
-        const categories = Object.keys(AppConfig.CATEGORIES || {});
+        const categories = this.categoryManager.categories.map(c => `${c.category} / ${c.subcategory}`);
         
         // Updated prompt for consistent structure
         const prompt = `Categorize this financial transaction:

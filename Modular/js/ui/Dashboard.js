@@ -46,6 +46,7 @@ export class Dashboard {
         }
     }
     
+import { DateUtils } from '../utils/DateUtils.js';
     updateRecentTransactions(transactions, accounts) {
         const container = document.getElementById('recentTransactions');
         if (!container) return;
@@ -65,7 +66,7 @@ export class Dashboard {
             div.innerHTML = `
                 <div>
                     <div class="text-sm font-medium text-gray-900">${transaction.description}</div>
-                    <div class="text-xs text-gray-500">${accountName} • ${transaction.category} • ${new Date(transaction.date.seconds * 1000).toLocaleDateString()}</div>
+                    <div class="text-xs text-gray-500">${accountName} • ${transaction.category} • ${DateUtils.formatDate(transaction.date)}</div>
                 </div>
                 <div class="text-sm font-medium ${typeColor}">
                     ${transaction.type === 'Expense' ? '-' : ''}${CurrencyUtils.format(Math.abs(transaction.amount))}
