@@ -1,6 +1,8 @@
 // Enhanced Transaction Editor - Integration with Category Manager (Refactored)
 // File: js/ui/EnhancedTransactionUI.js
 
+import { sanitizeHTML } from '../utils/Sanitizer.js';
+
 export class EnhancedTransactionUI {
     constructor(services) {
         this.services = services; // { dataService, categoryManager, appController, appConfig }
@@ -139,11 +141,13 @@ export class EnhancedTransactionUI {
 
     populateEditForm(transaction) {
         const form = this.elements.editorForm;
+        const safeDescription = sanitizeHTML(transaction.description);
+
         form.innerHTML = `
             <input type="hidden" name="id" value="${transaction.id}">
-            <div class="bg-gray-100 p-2 rounded"><strong>Original:</strong> ${transaction.description}</div>
+            <div class="bg-gray-100 p-2 rounded"><strong>Original:</strong> ${safeDescription}</div>
             <div><label class="block text-sm">Date</label><input type="date" name="date" value="${transaction.date}" class="w-full p-2 border rounded"></div>
-            <div><label class="block text-sm">Description</label><input type="text" name="description" value="${transaction.description}" class="w-full p-2 border rounded"></div>
+            <div><label class="block text-sm">Description</label><input type="text" name="description" value="${safeDescription}" class="w-full p-2 border rounded"></div>
             <div><label class="block text-sm">Amount</label><input type="number" name="amount" value="${transaction.amount}" class="w-full p-2 border rounded"></div>
             <div><label class="block text-sm">Category</label><select name="categoryId" class="w-full p-2 border rounded"></select></div>
             <div class="flex justify-end space-x-2">

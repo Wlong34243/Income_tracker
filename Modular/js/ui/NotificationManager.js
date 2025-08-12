@@ -1,6 +1,8 @@
 // js/ui/NotificationManager.js
 // Global notification system for the application
 
+import { sanitizeHTML } from '../utils/Sanitizer.js';
+
 export class NotificationManager {
     constructor() {
         this.notifications = [];
@@ -72,13 +74,15 @@ export class NotificationManager {
         element.className = `${config.bg} text-white px-4 py-3 rounded-lg shadow-lg flex items-center space-x-3 transform transition-all duration-300 translate-x-0 opacity-100`;
         element.innerHTML = `
             <div class="flex-shrink-0">${config.icon}</div>
-            <div class="flex-1">${notification.message}</div>
-            <button onclick="notificationManager.remove('${notification.id}')" class="flex-shrink-0 hover:opacity-75">
+            <div class="flex-1">${sanitizeHTML(notification.message)}</div>
+            <button class="flex-shrink-0 hover:opacity-75">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
             </button>
         `;
+
+        element.querySelector('button').addEventListener('click', () => this.remove(notification.id));
 
         // Add entrance animation
         element.style.animation = 'slideInRight 0.3s ease-out';
@@ -120,10 +124,6 @@ export class NotificationManager {
         this.notifications.forEach(n => this.remove(n.id));
     }
 }
-
-// Create singleton instance
-export const notificationManager = new NotificationManager();
-window.notificationManager = notificationManager;
 
 // Add CSS animations
 const style = document.createElement('style');

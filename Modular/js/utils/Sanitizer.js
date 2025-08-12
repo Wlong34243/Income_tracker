@@ -12,5 +12,7 @@ export function sanitizeHTML(str) {
   }
   const div = document.createElement('div');
   div.textContent = String(str);
-  return div.innerHTML;
+  // Also handle double quotes, as jsdom's innerHTML might not escape them,
+  // and the test suite expects this behavior for consistency.
+  return div.innerHTML.replace(/"/g, '&quot;');
 }
