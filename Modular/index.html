@@ -177,11 +177,12 @@
 
             // Step 3: Instantiate UI and integration layers. These often depend on the
             // core services created in the previous step.
-            const settingsManager = new SettingsManager(geminiService);
             const categoryIntegration = new CategoryIntegration(dataService, AppConfig, {
                 ui: { showNotification: notificationManager.show.bind(notificationManager) }
             });
             const integrationServices = await categoryIntegration.initialize();
+
+            const settingsManager = new SettingsManager(geminiService, integrationServices.categoryManager);
 
             const uiManager = new UIManager({
                 ...integrationServices,
