@@ -3,11 +3,12 @@
   "version": "1.0.0",
   "description": "Modular Personal Finance Tracker with Real Estate and Tech Business Analytics",
   "main": "index.html",
+  "type": "module",
   "scripts": {
     "start": "npx http-server . -p 8080 -o",
     "dev": "npx live-server . --port=8080",
     "build": "echo 'No build step required'",
-    "test": "echo 'No tests yet'"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -18,6 +19,8 @@
   },
   "devDependencies": {
     "http-server": "^14.1.1",
+    "jest": "^30.0.5",
+    "jest-environment-jsdom": "^30.0.5",
     "live-server": "^1.2.2"
   },
   "keywords": [
