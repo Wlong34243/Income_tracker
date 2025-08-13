@@ -74,8 +74,9 @@
 
         // Main Integration Layer
         import { CategoryIntegration } from './js/integration/CategoryIntegration.js';
-        // Utilities
+        // Utilities & Analytics
         import { TransferMatcher } from './js/utils/TransferMatcher.js';
+        import { BusinessAnalytics } from './js/analytics/BusinessAnalytics.js';
 
         class App {
             constructor(authService, dataService, uiManager, categoryIntegration, settingsManager) {
@@ -117,7 +118,11 @@
                         console.log(`Found ${transferPairs.length} transfer pairs.`);
                     }
 
-                    this.uiManager.renderDashboard(this.transactions, this.accounts);
+                    // Generate the business analytics report
+                    const analytics = new BusinessAnalytics(this.transactions);
+                    const report = analytics.generateReport();
+
+                    this.uiManager.renderDashboard(report);
                     this.uiManager.renderTransactionList(this.transactions);
 
                 } catch (error) {
