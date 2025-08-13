@@ -1,4 +1,5 @@
 import { sanitizeHTML } from '../utils/Sanitizer.js';
+import { DashboardUI } from './DashboardUI.js';
 
 export class UIManager {
     constructor(services) {
@@ -250,8 +251,8 @@ export class UIManager {
         this.services.authService.renderAuthUI(this.elements.authContainer);
     }
 
-    renderDashboard(transactions, accounts) {
-        this.elements.dashboardContainer.innerHTML = `...`; // Keep it simple
+    renderDashboard(report) {
+        DashboardUI.render(report, this.elements.dashboardContainer);
     }
 
     renderTransactionList(transactions) {
@@ -270,7 +271,9 @@ export class UIManager {
     createTransactionRow(transaction) {
         const amountColor = transaction.amount < 0 ? 'text-red-600' : 'text-green-600';
         const formattedAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(transaction.amount);
-        const categoryDisplay = transaction.category && transaction.category !== 'Uncategorized'
+
+        // FIX: The check for "Uncategorized" should be on the subcategory, not the main category.
+        const categoryDisplay = transaction.subcategory && transaction.subcategory !== 'Uncategorized'
             ? `${sanitizeHTML(transaction.category)} / ${sanitizeHTML(transaction.subcategory)}`
             : 'Uncategorized';
 

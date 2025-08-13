@@ -112,7 +112,14 @@ export class CategoryAwareCSVImporter {
 
     categorizeTransactions(transactions) {
         return transactions.map((transaction, index) => {
-            const categoryResult = this.categoryManager.categorizeTransaction(transaction);
+            // Per user request, try account-specific rules first
+            let categoryResult = this.categoryManager.categorizeByAccount(transaction);
+
+            // If no account-specific match, use the general categorization flow
+            if (!categoryResult) {
+                categoryResult = this.categoryManager.categorizeTransaction(transaction);
+            }
+
             const categorized = { ...transaction, ...categoryResult, importId: `import_${Date.now()}_${index}` };
             this.updateStatsForMethod(categoryResult.method);
             return categorized;
