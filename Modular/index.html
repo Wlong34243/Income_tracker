@@ -74,6 +74,8 @@
 
         // Main Integration Layer
         import { CategoryIntegration } from './js/integration/CategoryIntegration.js';
+        // Utilities
+        import { TransferMatcher } from './js/utils/TransferMatcher.js';
 
         class App {
             constructor(authService, dataService, uiManager, categoryIntegration, settingsManager) {
@@ -109,6 +111,12 @@
                     
                     console.log(`Loaded ${this.accounts.length} accounts and ${this.transactions.length} transactions.`);
                     
+                    // Match transfers after loading
+                    const transferPairs = TransferMatcher.findTransferPairs(this.transactions);
+                    if (transferPairs.length > 0) {
+                        console.log(`Found ${transferPairs.length} transfer pairs.`);
+                    }
+
                     this.uiManager.renderDashboard(this.transactions, this.accounts);
                     this.uiManager.renderTransactionList(this.transactions);
 
@@ -119,10 +127,15 @@
             }
 
             async addTransaction(data) {
-                const newTransaction = await this.dataService.addTransaction(data);
-                this.transactions.unshift(newTransaction);
-                this.uiManager.renderTransactionList(this.transactions);
-                this.uiManager.showNotification("Transaction added successfully.", "success");
+                try {
+                    const newTransaction = await this.dataService.saveTransaction(data);
+                    this.transactions.unshift(newTransaction);
+                    this.uiManager.renderTransactionList(this.transactions);
+                    this.uiManager.showNotification("Transaction added successfully.", "success");
+                } catch (error) {
+                    console.error("Failed to add transaction:", error);
+                    this.uiManager.showNotification(error.message, "error");
+                }
             }
 
             async updateTransaction(data) {

@@ -1,4 +1,5 @@
 import { sanitizeHTML } from '../utils/Sanitizer.js';
+import { SimpleDashboard } from './SimpleDashboard.js';
 
 export class UIManager {
     constructor(services) {
@@ -251,7 +252,7 @@ export class UIManager {
     }
 
     renderDashboard(transactions, accounts) {
-        this.elements.dashboardContainer.innerHTML = `...`; // Keep it simple
+        SimpleDashboard.render(transactions, accounts, this.elements.dashboardContainer);
     }
 
     renderTransactionList(transactions) {
