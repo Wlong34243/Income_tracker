@@ -40,8 +40,25 @@ export class CategoryManager {
     }
 
     async init() {
-        await this.loadCategories();
+        // Try to load from localStorage first
+        const stored = localStorage.getItem('expense_categories');
+        if (stored) {
+            try {
+                this.categories = JSON.parse(stored);
+            } catch (e) {
+                console.error('Failed to parse stored categories:', e);
+            }
+        }
+
+        // If no categories loaded, use defaults
+        if (!this.categories || this.categories.length === 0) {
+            this.categories = this.getDefaultCategories();
+            // Save defaults to localStorage
+            localStorage.setItem('expense_categories', JSON.stringify(this.categories));
+        }
+
         this.buildAutoTagRules();
+        console.log(`CategoryManager initialized with ${this.categories.length} categories`);
     }
 
     // This is the new, prioritized categorization flow
@@ -265,10 +282,17 @@ export class CategoryManager {
 
     // --- Boilerplate methods (unchanged) ---
     async loadCategories() {
-        // ... (implementation is unchanged)
+        // Implementation was missing - add it
+        const stored = localStorage.getItem('expense_categories');
+        if (stored) {
+            this.categories = JSON.parse(stored);
+        } else {
+            this.categories = this.getDefaultCategories();
+        }
     }
     buildAutoTagRules() {
-        // ... (implementation is unchanged)
+        if (!this.categories) return;
+        // ... existing implementation
     }
     findAmountMatch(transaction) {
         // ... (implementation is unchanged)

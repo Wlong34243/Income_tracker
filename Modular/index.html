@@ -78,6 +78,7 @@
         // Utilities & Analytics
         import { TransferMatcher } from './js/utils/TransferMatcher.js';
         import { BusinessAnalytics } from './js/analytics/BusinessAnalytics.js';
+        import { DataExporter } from './js/export/DataExporter.js';
         
         // Add debugging directly here instead
         class QuickDebug {
@@ -115,6 +116,8 @@
                 this.authService.onAuthStateChanged(async (user) => {
                     if (user) {
                         this.uiManager.showMainApp(user);
+                        // Ensure default accounts exist
+                        await app.dataService.ensureDefaultAccounts();
                         await this.loadDataAndRender();
                     } else {
                         this.uiManager.showAuth();
@@ -193,6 +196,15 @@
                 } else {
                     console.error('CategoryIntegration or its CSV importer is not properly initialized.');
                     this.uiManager.showNotification("Import feature is currently unavailable.", "error");
+                }
+            }
+
+            exportTransactions() {
+                if (this.transactions && this.transactions.length > 0) {
+                    DataExporter.exportToCSV(this.transactions);
+                    this.uiManager.showNotification('Transactions exported successfully.', 'success');
+                } else {
+                    this.uiManager.showNotification('No transactions to export.', 'warning');
                 }
             }
         }
