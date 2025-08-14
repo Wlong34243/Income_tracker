@@ -7,10 +7,10 @@ import { CategoryAwareCSVImporter } from '../import/CategoryAwareCSVImporter.js'
 import { AppConfig } from '../config/AppConfig.js'; // Assuming path to AppConfig
 
 export class CategoryIntegration {
-    constructor(dataService, appConfig, appController) {
-        this.dataService = dataService;
-        this.appConfig = appConfig;
+    constructor(appController) {
         this.appController = appController;
+        this.dataService = appController.dataService;
+        this.appConfig = appController.config || AppConfig;
 
         this.categoryManager = null;
         this.enhancedTransactionUI = null;
@@ -18,7 +18,6 @@ export class CategoryIntegration {
     }
 
     async initialize() {
-
         // Initialize services
         this.categoryManager = new CategoryManager(this.dataService, this.appConfig);
         await this.categoryManager.init();
@@ -44,54 +43,6 @@ export class CategoryIntegration {
             enhancedTransactionUI: this.enhancedTransactionUI,
             csvImporter: this.categoryAwareCSVImporter,
         };
-
-        if (this.isInitialized) return;
-
-        try {
-            // Initialize Category Manager
-            this.categoryManager = new CategoryManager();
-            await this.categoryManager.init();
-
-            // Initialize Enhanced Transaction UI
-            this.enhancedTransactionUI = new EnhancedTransactionUI({
-                dataService: this.app.dataService,
-                categoryManager: this.categoryManager,
-                appController: this.app,
-                appConfig: this.app.config || AppConfig // Import AppConfig if needed
-            });
-
-            // Initialize Category-Aware CSV Importer
-            this.categoryAwareCSVImporter = new CategoryAwareCSVImporter(
-                this.app.dataService,
-                this.categoryManager
-            );
-
-            // Integrate with existing app components
-            this.integrateWithExistingComponents();
-
-            // Add new UI elements
-            this.addCategoryManagementUI();
-
-            // Set up event listeners
-            this.setupGlobalEventListeners();
-
-            // Make instances globally available for inline event handlers
-            window.categoryIntegration = this;
-
-            this.isInitialized = true;
-            console.log('✅ Category Integration initialized successfully');
-
-            // Return the created services so they can be injected into other modules
-            return {
-                categoryManager: this.categoryManager,
-                enhancedTransactionUI: this.enhancedTransactionUI,
-                csvImporter: this.categoryAwareCSVImporter
-            };
-
-        } catch (error) {
-            console.error('❌ Failed to initialize Category Integration:', error);
-            throw error;
-        }
     }
 
     integrateWithExistingComponents() {

@@ -8,11 +8,11 @@ jobs:
   build_and_preview:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-
-      # Install dependencies within the Modular directory
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       - run: npm ci
-        working-directory: ./Modular
 
       # Build the project (if there's a build step)
       - run: npm run build

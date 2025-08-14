@@ -1,0 +1,14 @@
+{
+  "name": "finance-tracker",
+  "version": "2.0.0",
+  "description": "Personal Finance Tracker",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "@jest/globals": "^29.0.0",
+    "jsdom": "^22.0.0"
+  }
+}
