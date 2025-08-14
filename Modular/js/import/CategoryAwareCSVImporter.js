@@ -101,7 +101,7 @@ export class CategoryAwareCSVImporter {
 
             if (format === 'CHASE_CHECKING') {
                 transaction = {
-                    date: this.parseDate(row['Posting Date']),
+                    date: this.parseValidDate(row['Posting Date']),
                     description: row['Description'] || '',
                     amount: this.parseAmount(row['Amount']),
                     type: row['Type'] || '',
@@ -112,7 +112,7 @@ export class CategoryAwareCSVImporter {
                 // Handle both 7 and 8 column versions
                 const amount = this.parseAmount(row['Amount']);
                 transaction = {
-                    date: this.parseDate(row['Transaction Date'] || row['Post Date']),
+                    date: this.parseValidDate(row['Transaction Date'] || row['Post Date']),
                     description: row['Description'] || '',
                     amount: -Math.abs(amount), // Credit charges are negative
                     category: row['Category'] || '',
@@ -130,7 +130,7 @@ export class CategoryAwareCSVImporter {
         return transactions;
     }
 
-    parseDate(dateStr) {
+    parseValidDate(dateStr) {
         if (!dateStr) return null;
 
         // Handle MM/DD/YYYY format

@@ -4,9 +4,8 @@
 import { AppConfig } from '../config/AppConfig.js';
 
 class GeminiService {
-    constructor(categoryManager) {
-        this.categoryManager = categoryManager;
-        this.apiKey = this.getApiKey();
+    constructor(apiKey = null) {
+        this.apiKey = apiKey || this.getApiKey();
         this.apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
         // this.transactionHistory is unused, so it has been removed.
         this.stats = {

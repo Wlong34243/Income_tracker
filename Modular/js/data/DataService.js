@@ -40,7 +40,7 @@ export class DataService {
            ];
 
            for (const account of defaults) {
-               await this.saveAccount(account);
+               await this.saveAccount({ ...account, balance: 0 });
            }
            return defaults;
        }
@@ -167,4 +167,18 @@ export class DataService {
     }
 
     // ... other localStorage methods
+    saveToLocalStorage(key, data) {
+        const existing = this.loadFromLocalStorage(key, []);
+        existing.push(data);
+        localStorage.setItem(key, JSON.stringify(existing));
+        return data;
+    }
+
+    loadTransactionsFromLocalStorage(userId) {
+        return this.loadFromLocalStorage(`demo-transactions-${userId}`, []);
+    }
+
+    saveTransactionToLocalStorage(key, transaction) {
+        return this.saveToLocalStorage(key, transaction);
+    }
 }
