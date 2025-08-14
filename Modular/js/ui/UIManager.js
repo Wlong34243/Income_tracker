@@ -39,6 +39,17 @@ export class UIManager {
         // Main Header Buttons
         this.elements.headerButtons.querySelector('#importTransactionsBtn').addEventListener('click', () => this.openCsvImportModal());
         this.elements.headerButtons.querySelector('#addTransactionBtn').addEventListener('click', () => this.services.enhancedTransactionUI.openAddModal(this.app.accounts));
+
+        const exportBtn = document.createElement('button');
+        exportBtn.id = 'exportTransactionsBtn';
+        exportBtn.className = 'bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition flex items-center gap-2 text-sm';
+        exportBtn.textContent = 'Export';
+        this.elements.headerButtons.insertBefore(exportBtn, this.elements.headerButtons.querySelector('#addTransactionBtn').nextSibling);
+
+        this.elements.headerButtons.querySelector('#exportTransactionsBtn').addEventListener('click', () => {
+            this.app.exportTransactions();
+        });
+
         this.elements.headerButtons.querySelector('#logoutBtn').addEventListener('click', () => this.services.authService.signOut());
 
         const aiCategorizeBtn = document.createElement('button');
@@ -61,6 +72,39 @@ export class UIManager {
             if (editBtn) {
                 const transaction = this.app.transactions.find(t => t.id === editBtn.dataset.id);
                 if (transaction) this.services.enhancedTransactionUI.openEditPanel(transaction);
+            }
+        });
+
+        // Add handler for quick category changes
+        this.elements.transactionsContainer.addEventListener('change', async (e) => {
+            if (e.target.classList.contains('quick-category')) {
+                const transactionId = e.target.dataset.id;
+                const newCategory = e.target.value;
+
+                if (newCategory && transactionId) {
+                    try {
+                        // Find the transaction
+                        const transaction = this.app.transactions.find(t => t.id === transactionId);
+                        if (!transaction) return;
+
+                        // Update with new category
+                        await this.app.dataService.updateTransaction(transactionId, {
+                            category: newCategory,
+                            entity: newCategory.includes('Real Estate') ? 'Real Estate' :
+                                    newCategory.includes('Tech') ? 'Tech Business' : 'Personal'
+                        });
+
+                        // Reload
+                        await this.app.loadDataAndRender();
+                        this.showNotification('Category updated', 'success');
+                    } catch (error) {
+                        console.error('Failed to update category:', error);
+                        this.showNotification('Failed to update category', 'error');
+                    }
+                }
+
+                // Reset dropdown
+                e.target.value = '';
             }
         });
     }

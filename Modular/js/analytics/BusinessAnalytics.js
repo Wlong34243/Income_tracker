@@ -4,12 +4,18 @@ export class BusinessAnalytics {
         // This mapping should ideally come from a config file, but for now,
         // we include it here as per the user's context.
         this.tenantPropertyMap = {
-            'jack sevilla': '5th Street', 'araceli ponce': 'Oak Avenue',
-            'lucy cepeda': 'Main Street', 'jesus cruz': 'Elm Court',
-            'angel de la cruz': 'Maple Drive', 'pablo joaquin': 'Pine Place',
-            'wendy cordova': 'Birch Lane', 'geron vile': 'Cedar Crest',
-            'michelle ruth': 'Willow Way', 'steven malloy': 'Aspen Alley',
-            'claribel castillomero': 'Redwood Rise', 'belem amaro': 'Sequoia Spot'
+            'jack sevilla': '5th ST E',
+            'araceli ponce': '5th ST E',
+            'lucy cepeda': '2024 50th',
+            'jesus cruz': '2024 50th',
+            'angel de la cruz': 'Las Palmas',
+            'pablo joaquin': '37th Ave E',
+            'wendy cordova': '2nd St W',
+            'geron vile': '2nd St W',
+            'michelle ruth': '1112 36th St W',
+            'steven malloy': '1112 36th St W',
+            'claribel castillomero': '59th Ave E',
+            'belem amaro': '59th Ave E'
         };
     }
 

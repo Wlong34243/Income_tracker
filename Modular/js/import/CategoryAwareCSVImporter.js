@@ -15,34 +15,36 @@ export class CategoryAwareCSVImporter {
         return altMatch ? altMatch[1] : null;
     }
 
-    parseCSV(file, accountId) {
+    async parseCSV(file, accountId) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = (e) => {
+            reader.onload = async (e) => {
                 const text = e.target.result;
 
-                // Parse with Papa Parse - be flexible with columns
                 Papa.parse(text, {
                     header: true,
                     skipEmptyLines: true,
                     trimHeaders: true,
-                    dynamicTyping: false, // Keep as strings for now
-                    complete: (results) => {
+                    dynamicTyping: false,
+                    complete: async (results) => {
                         if (results.errors.length > 0) {
                             console.warn('CSV parsing warnings:', results.errors);
-                            // Don't reject on warnings, continue
                         }
 
-                        // Auto-detect format based on headers
                         const headers = results.meta.fields;
                         const format = this.detectFormat(headers);
 
-                        // Process based on format
-                        const transactions = this.processTransactions(
+                        let transactions = this.processTransactions(
                             results.data,
                             format,
                             accountId
                         );
+
+                        const duplicates = await this.findDuplicates(transactions);
+                        if (duplicates.length > 0) {
+                            console.log(`Found ${duplicates.length} duplicate transactions, skipping...`);
+                            transactions = transactions.filter(t => !duplicates.some(d => d.description === t.description && d.date === t.date && d.amount === t.amount));
+                        }
 
                         resolve(transactions);
                     },
@@ -53,6 +55,26 @@ export class CategoryAwareCSVImporter {
             };
             reader.readAsText(file);
         });
+    }
+
+    async findDuplicates(transactions) {
+        const existing = await this.dataService.loadTransactions(500);
+        const duplicates = [];
+
+        for (const newTx of transactions) {
+            const isDuplicate = existing.some(existingTx =>
+                existingTx.date === newTx.date &&
+                Math.abs(existingTx.amount - newTx.amount) < 0.01 &&
+                existingTx.description === newTx.description &&
+                existingTx.accountId === newTx.accountId
+            );
+
+            if (isDuplicate) {
+                duplicates.push(newTx);
+            }
+        }
+
+        return duplicates;
     }
 
     detectFormat(headers) {
