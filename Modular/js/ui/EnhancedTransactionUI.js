@@ -150,6 +150,8 @@ export class EnhancedTransactionUI {
             <div><label class="block text-sm">Description</label><input type="text" name="description" value="${safeDescription}" class="w-full p-2 border rounded"></div>
             <div><label class="block text-sm">Amount</label><input type="number" name="amount" value="${transaction.amount}" class="w-full p-2 border rounded"></div>
             <div><label class="block text-sm">Category</label><select name="categoryId" class="w-full p-2 border rounded"></select></div>
+            <div id="property-selector-container"></div>
+            <div><label class="block text-sm">Notes</label><textarea name="notes" class="w-full p-2 border rounded">${transaction.notes || ''}</textarea></div>
             <div class="flex justify-end space-x-2">
                 <button type="button" id="cancelEditBtn" class="px-4 py-2 bg-gray-200 rounded">Cancel</button>
                 <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
@@ -182,25 +184,64 @@ export class EnhancedTransactionUI {
             });
             select.appendChild(optgroup);
         });
+
+        select.addEventListener('change', (e) => {
+            const selectedOption = e.target.selectedOptions[0];
+            const entity = selectedOption ? selectedOption.dataset.entity : null;
+            this.togglePropertySelector(entity, transaction.property);
+        });
+
+        // Initial check
+        const selectedOption = select.selectedOptions[0];
+        const initialEntity = selectedOption ? selectedOption.dataset.entity : null;
+        this.togglePropertySelector(initialEntity, transaction.property);
+    }
+
+    togglePropertySelector(entity, selectedProperty) {
+        const container = this.elements.editorForm.querySelector('#property-selector-container');
+        if (entity === 'Real Estate') {
+            const properties = Object.values(this.categoryManager.tenantPropertyMap).filter(p => p);
+            const uniqueProperties = [...new Set(properties)];
+
+            let options = uniqueProperties.map(p => `<option value="${p}" ${p === selectedProperty ? 'selected' : ''}>${p}</option>`).join('');
+
+            container.innerHTML = `
+                <label class="block text-sm">Property</label>
+                <select name="property" class="w-full p-2 border rounded">
+                    <option value="">Select Property...</option>
+                    ${options}
+                </select>
+            `;
+        } else {
+            container.innerHTML = '';
+        }
     }
 
     async handleUpdateTransaction() {
-        const form = this.elements.editorForm;
-        const categorySelect = form.querySelector('select[name="categoryId"]');
-        const selectedOption = categorySelect.selectedOptions[0];
+       const form = this.elements.editorForm;
+       const categorySelect = form.querySelector('select[name="categoryId"]');
+       const selectedOption = categorySelect.selectedOptions[0];
 
-        const data = {
-            id: form.id.value,
-            date: form.date.value,
-            description: form.description.value,
-            amount: parseFloat(form.amount.value),
-            category: selectedOption.dataset.category,
-            subcategory: selectedOption.textContent,
-            entity: selectedOption.dataset.entity,
-        };
+       const updates = {
+           id: form.id.value,
+           date: form.date.value,
+           description: form.description.value,
+           amount: parseFloat(form.amount.value),
+           category: selectedOption?.dataset.category || 'Uncategorized',
+           subcategory: selectedOption?.textContent || null,
+           entity: selectedOption?.dataset.entity || null,
+           property: form.property?.value || null,
+           notes: form.notes?.value || null
+       };
 
-        await this.app.updateTransaction(data);
-        this.closeEditPanel();
+       try {
+           await this.app.updateTransaction(updates.id, updates);
+           this.closeEditPanel();
+           this.app.uiManager.showNotification('Transaction updated successfully', 'success');
+       } catch (error) {
+           console.error('Update failed:', error);
+           this.app.uiManager.showNotification('Failed to update transaction', 'error');
+       }
     }
 
     loadProperties() {

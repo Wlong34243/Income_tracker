@@ -45,6 +45,23 @@ class GeminiService {
         this.apiKey = apiKey;
     }
 
+    async testConnection() {
+       if (!this.apiKey) return false;
+       try {
+           const response = await fetch(`${this.apiUrl}?key=${this.apiKey}`, {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({
+                   contents: [{ parts: [{ text: "Test" }] }]
+               })
+           });
+           return response.ok;
+       } catch (error) {
+           console.error('Gemini test failed:', error);
+           return false;
+       }
+    }
+
     async categorizeTransaction(transaction, options = {}) {
         if (!this.apiKey) {
             return this.fallbackCategorization(transaction);

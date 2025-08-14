@@ -6,19 +6,37 @@ export class CategoryManager {
         this.autoTagRules = new Map();
         // This can be expanded or loaded from config
         this.tenantPropertyMap = {
-            'jack sevilla': 'Property A',
-            'araceli ponce': 'Property B',
-            'lucy cepeda': 'Property C',
-            'jesus cruz': 'Property D',
-            'angel de la cruz': 'Property E',
-            'pablo joaquin': 'Property F',
-            'wendy cordova': 'Property G',
-            'geron vile': 'Property H',
-            'michelle ruth': 'Property I',
-            'steven malloy': 'Property J',
-            'claribel castillomero': 'Property K',
-            'belem amaro': 'Property L'
+            'jack sevilla': '5th ST E',
+            'araceli ponce': '5th ST E',
+            'lucy cepeda': '2024 50th',
+            'jesus cruz': '2024 50th',
+            'angel de la cruz': 'Las Palmas',
+            'pablo joaquin': '37th Ave E',
+            'wendy cordova': '2nd St W',
+            'geron vile': '2nd St W',
+            'michelle ruth': '1112 36th St W',
+            'steven malloy': '1112 36th St W',
+            'claribel castillomero': '59th Ave E',
+            'belem amaro': '59th Ave E',
+            // Special case - not tied to property
+            'michael katzen': null  // Lisa's income, not property-related
         };
+    }
+
+    getCategoriesForDropdown() {
+       const grouped = {};
+       this.categories.forEach(cat => {
+           if (!grouped[cat.category]) {
+               grouped[cat.category] = [];
+           }
+           grouped[cat.category].push({
+               id: cat.id || `${cat.category}_${cat.subcategory}`,
+               category: cat.category,
+               subcategory: cat.subcategory,
+               entity: cat.entity
+           });
+       });
+       return grouped;
     }
 
     async init() {
@@ -28,6 +46,21 @@ export class CategoryManager {
 
     // This is the new, prioritized categorization flow
     categorizeTransaction(transaction) {
+        // Special rule for Lisa's income
+        if (transaction.accountId === '0111' && transaction.amount === 1500) {
+           const desc = transaction.description.toLowerCase();
+           if (desc.includes('michael katzen') || desc.includes('deposit') && desc.includes('927579')) {
+               return {
+                   category: 'Personal Income',
+                   subcategory: "Lisa's Monthly Income",
+                   entity: 'Personal',
+                   property: null,  // Not tied to any property
+                   confidence: 0.95,
+                   method: 'lisa_income_rule'
+               };
+           }
+        }
+
         // 1. ACCOUNT-SPECIFIC RULES (HIGHEST PRIORITY)
         const accountMatch = this.categorizeByAccount(transaction);
         if (accountMatch) return accountMatch;
@@ -250,4 +283,18 @@ export class CategoryManager {
         // ... (implementation is unchanged)
     }
     // ... and so on for all other existing methods
+    learnFromCorrection(transaction, newCategory) {
+       const rule = {
+           pattern: transaction.description.toLowerCase(),
+           category: newCategory.category,
+           subcategory: newCategory.subcategory,
+           entity: newCategory.entity,
+           confidence: 0.9
+       };
+
+       // Save to localStorage for persistence
+       const customRules = JSON.parse(localStorage.getItem('learned_rules') || '[]');
+       customRules.push(rule);
+       localStorage.setItem('learned_rules', JSON.stringify(customRules));
+    }
 }

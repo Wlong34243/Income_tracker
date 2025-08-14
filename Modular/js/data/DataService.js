@@ -21,6 +21,32 @@ export class DataService {
         return userId;
     }
 
+    async ensureDefaultAccounts() {
+       const userId = this._getUserId();
+       const accounts = await this.loadAccounts();
+
+       if (accounts.length === 0) {
+           console.log('Creating default accounts for new user...');
+           const defaults = [
+               { accountId: '0111', name: 'Sweep Account', type: 'Checking', entity: 'Real Estate' },
+               { accountId: '8529', name: 'Real Estate Ops', type: 'Business', entity: 'Real Estate' },
+               { accountId: '7991', name: 'Tech Auditing', type: 'Business', entity: 'Tech Business' },
+               { accountId: '2299', name: 'Business Expenses', type: 'Credit Card', entity: 'Tech Business' },
+               { accountId: '7588', name: 'Shared Checking', type: 'Checking', entity: 'Personal' },
+               { accountId: '2433', name: 'Visa Prime', type: 'Credit Card', entity: 'Personal' },
+               { accountId: '8895', name: 'Self-Directed Investment', type: 'Investment', entity: 'Investment' },
+               { accountId: '0898', name: "Lisa's Income", type: 'Checking', entity: 'Personal' },
+               { accountId: '119', name: 'Schwab Brokerage', type: 'Investment', entity: 'Investment' }
+           ];
+
+           for (const account of defaults) {
+               await this.saveAccount(account);
+           }
+           return defaults;
+       }
+       return accounts;
+    }
+
     async loadAccounts() {
         const userId = this._getUserId();
         if (AppConfig.DEMO_MODE) return this.loadFromLocalStorage(`demo-accounts-${userId}`, []);
