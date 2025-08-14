@@ -4,6 +4,7 @@
 import { CategoryManager } from '../categorization/CategoryManager.js';
 import { EnhancedTransactionUI } from '../ui/EnhancedTransactionUI.js';
 import { CategoryAwareCSVImporter } from '../import/CategoryAwareCSVImporter.js';
+import { AppConfig } from '../config/AppConfig.js'; // Assuming path to AppConfig
 
 export class CategoryIntegration {
     constructor(dataService, appConfig, appController) {
@@ -52,11 +53,12 @@ export class CategoryIntegration {
             await this.categoryManager.init();
 
             // Initialize Enhanced Transaction UI
-            this.enhancedTransactionUI = new EnhancedTransactionUI(
-                this.app.dataService,
-                this.app,
-                this.categoryManager
-            );
+            this.enhancedTransactionUI = new EnhancedTransactionUI({
+                dataService: this.app.dataService,
+                categoryManager: this.categoryManager,
+                appController: this.app,
+                appConfig: this.app.config || AppConfig // Import AppConfig if needed
+            });
 
             // Initialize Category-Aware CSV Importer
             this.categoryAwareCSVImporter = new CategoryAwareCSVImporter(
@@ -79,6 +81,13 @@ export class CategoryIntegration {
             this.isInitialized = true;
             console.log('✅ Category Integration initialized successfully');
 
+            // Return the created services so they can be injected into other modules
+            return {
+                categoryManager: this.categoryManager,
+                enhancedTransactionUI: this.enhancedTransactionUI,
+                csvImporter: this.categoryAwareCSVImporter
+            };
+
         } catch (error) {
             console.error('❌ Failed to initialize Category Integration:', error);
             throw error;
@@ -86,6 +95,9 @@ export class CategoryIntegration {
     }
 
     integrateWithExistingComponents() {
+        // This check is important because the app object is passed in and may not have all properties yet
+        if (!this.app) return;
+
         // Replace existing CSV importer
         if (this.app.csvImporter) {
             this.app.csvImporter = this.categoryAwareCSVImporter;

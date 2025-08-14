@@ -74,22 +74,41 @@
 
         // Main Integration Layer
         import { CategoryIntegration } from './js/integration/CategoryIntegration.js';
+        
         // Utilities & Analytics
         import { TransferMatcher } from './js/utils/TransferMatcher.js';
         import { BusinessAnalytics } from './js/analytics/BusinessAnalytics.js';
+        
+        // Add debugging directly here instead
+        class QuickDebug {
+            constructor(app) {
+                this.app = app;
+                console.log('🔍 Debug initialized');
+            }
+            
+            checkStatus() {
+                console.group('📊 App Status');
+                console.log('App exists:', !!this.app);
+                console.log('User:', this.app?.authService?.currentUser?.email || 'Not logged in');
+                console.log('Accounts:', this.app?.accounts?.length || 0);
+                console.log('Transactions:', this.app?.transactions?.length || 0);
+                console.groupEnd();
+            }
+        }
 
         class App {
-            constructor(authService, dataService, uiManager, categoryIntegration, settingsManager) {
-                this.authService = authService;
-                this.dataService = dataService;
-                this.uiManager = uiManager;
-                this.categoryIntegration = categoryIntegration;
-                this.settingsManager = settingsManager;
+            constructor() {
+                this.authService = null;
+                this.dataService = null;
+                this.uiManager = null;
+                this.categoryIntegration = null;
+                this.settingsManager = null;
                 this.transactions = [];
                 this.accounts = [];
+                this.config = AppConfig; // Make config available to integrations
             }
 
-            async init() {
+            init() {
                 this.uiManager.init(this);
                 this.settingsManager.init(this.uiManager);
 
@@ -132,6 +151,7 @@
             }
 
             async addTransaction(data) {
+                // FIX APPLIED: Changed addTransaction to saveTransaction
                 try {
                     const newTransaction = await this.dataService.saveTransaction(data);
                     this.transactions.unshift(newTransaction);
@@ -160,13 +180,19 @@
                  this.uiManager.showNotification("Transaction deleted.", "error");
             }
 
-            importTransactions(data) {
-                // This is a simplified view. The CSV importer from the integration layer will handle the details
-                const importer = this.categoryIntegration.csvImporter;
-                if (importer) {
-                    // In a real scenario, you'd pass the data to the importer and it would
-                    // call back to the app to add the transactions.
-                    console.log("Transaction import process started by UI manager.");
+            importTransactions(file) {
+                // Defensive check to ensure the integration layer is ready
+                if (this.categoryIntegration && this.categoryIntegration.csvImporter) {
+                    console.log("Transaction import process started via CategoryIntegration.");
+                    // The importer will handle file reading, parsing, and calling back to add transactions
+                    this.categoryIntegration.csvImporter.import(file, (transactions) => {
+                        console.log('transactions from importer', transactions);
+                        this.loadDataAndRender();
+                        this.uiManager.showNotification(`${transactions.length} transactions imported successfully.`, "success");
+                    });
+                } else {
+                    console.error('CategoryIntegration or its CSV importer is not properly initialized.');
+                    this.uiManager.showNotification("Import feature is currently unavailable.", "error");
                 }
             }
         }
@@ -193,15 +219,17 @@
             const geminiService = new GeminiService(AppConfig.GEMINI_API_KEY);
             await geminiService.initialize();
 
-            // Step 3: Instantiate UI and integration layers. These often depend on the
-            // core services created in the previous step.
-            const categoryIntegration = new CategoryIntegration(dataService, AppConfig, {
-                ui: { showNotification: notificationManager.show.bind(notificationManager) }
-            });
+            // Step 3: Create the main application controller shell.
+            const app = new App();
+            window.app = app; // Make app instance globally available
+            app.dataService = dataService; // Pass dataservice early for integrations
+
+            // Step 4: Instantiate and initialize the integration layer.
+            const categoryIntegration = new CategoryIntegration(app);
             const integrationServices = await categoryIntegration.initialize();
-
+            
+            // Step 5: Instantiate other managers that depend on the integration services.
             const settingsManager = new SettingsManager(geminiService, integrationServices.categoryManager);
-
             const uiManager = new UIManager({
                 ...integrationServices,
                 settingsManager,
@@ -209,17 +237,19 @@
                 authService
             });
 
-            // Step 4: Create the main application controller. This class orchestrates
-            // the overall application flow and holds the primary state.
-            const app = new App(authService, dataService, uiManager, integrationServices, settingsManager);
+            // Step 6: Fully configure the app controller with all its dependencies.
+            app.authService = authService;
+            app.uiManager = uiManager;
+            app.settingsManager = settingsManager;
+            app.categoryIntegration = integrationServices; // Add the integration services to the app
 
-            // Step 5: Initialize the app. This sets up the critical onAuthStateChanged
-            // listener. Data loading is triggered *inside* this listener, which is the
-            // correct way to ensure we only fetch data once we have an authenticated user.
-            // This prevents any race conditions between auth and data fetching.
-            await app.init();
+            // Step 7: Initialize the app's main logic (auth listener, data loading).
+            app.init();
 
             console.log("Finance Tracker Initialized");
+            
+            // Initialize new QuickDebug class
+            window.debugUtils = new QuickDebug(app);
         }
 
         // Run the app

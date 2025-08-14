@@ -2,20 +2,18 @@
 // Application Configuration and Constants
 
 export class AppConfig {
-    static DEMO_MODE = true; // Set to false for production
+    static DEMO_MODE = false; // Set to false for production with Firebase
 
     static FIREBASE_CONFIG = {
-        apiKey: "AIzaSyB7KeIMurnxmp0qys3NxrCTec-XE1Fw_js",
+        apiKey: "AIzaSyD1zR273R1HgrF697iQNv-mm4TE0UQbVWM",
         authDomain: "incometracker-9c4b5.firebaseapp.com",
         databaseURL: "https://incometracker-9c4b5-default-rtdb.firebaseio.com",
         projectId: "incometracker-9c4b5",
-        storageBucket: "incometracker-9c4b5.appspot.com", // Use .appspot.com for storageBucket
+        storageBucket: "incometracker-9c4b5.firebasestorage.app", // Updated from .appspot.com
         messagingSenderId: "497963901083",
         appId: "1:497963901083:web:e1e1db6719014fcb11e63e",
         measurementId: "G-MWS2E9YVE7"
     };
-    // ...rest of your config...
-
     
     // Your specific account mapping
     static ACCOUNT_MAPPING = {
@@ -88,7 +86,6 @@ export class AppConfig {
         '9th Street': []
     };
     
-    // Also ensure you have these category lists
     static INCOME_CATEGORIES = [
         'Rental Income',
         'Business Income',
