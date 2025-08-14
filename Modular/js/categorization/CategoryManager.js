@@ -297,4 +297,11 @@ export class CategoryManager {
        customRules.push(rule);
        localStorage.setItem('learned_rules', JSON.stringify(customRules));
     }
+
+    async categorizeAll(transactions) {
+        return transactions.map(transaction => {
+            const categoryResult = this.categorizeTransaction(transaction);
+            return { ...transaction, ...categoryResult };
+        });
+    }
 }

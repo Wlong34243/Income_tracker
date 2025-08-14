@@ -115,127 +115,113 @@ export class UIManager {
     }
 
     // --- CSV Import Modal ---
-    // ... (CSV import methods remain the same)
     renderCsvImportModal() {
         const modalHTML = `
             <div id="csvImportModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
                 <div class="modal-backdrop fixed inset-0 bg-black bg-opacity-50"></div>
                 <div class="flex items-center justify-center min-h-screen p-4">
-                    <div class="relative bg-white rounded-lg shadow-xl max-w-4xl w-full flex flex-col max-h-[90vh]">
-                        <div class="flex items-center justify-between p-4 border-b flex-shrink-0">
+                    <div class="relative bg-white rounded-lg shadow-xl max-w-2xl w-full">
+                        <div class="flex items-center justify-between p-4 border-b">
                             <h3 class="text-lg font-semibold">Import Transactions</h3>
                             <button id="closeCsvModalBtn" class="text-gray-400 hover:text-gray-600">&times;</button>
                         </div>
-                        <div id="csv-import-content" class="p-6 overflow-y-auto"></div>
-                        <div class="flex justify-end space-x-2 p-4 border-t flex-shrink-0">
-                            <button id="csvBackBtn" class="px-4 py-2 bg-gray-200 rounded">Back</button>
-                            <button id="csvNextBtn" class="px-4 py-2 bg-blue-600 text-white rounded">Next</button>
-                            <button id="csvConfirmBtn" class="hidden px-4 py-2 bg-green-600 text-white rounded">Confirm Import</button>
-                        </div>
+                        <div id="csv-import-content" class="p-6"></div>
                     </div>
                 </div>
             </div>
         `;
         this.elements.modalContainer.insertAdjacentHTML('beforeend', modalHTML);
         this.elements.csvImportModal = document.getElementById('csvImportModal');
-        this.addCsvModalListeners();
-    }
-
-    addCsvModalListeners() {
-        const modal = this.elements.csvImportModal;
-        modal.querySelector('#closeCsvModalBtn').addEventListener('click', () => modal.classList.add('hidden'));
-
-        modal.querySelector('#csvNextBtn').addEventListener('click', async () => {
-            const importer = this.services.csvImporter;
-            if (importer.currentStep === 'upload') {
-                const fileInput = modal.querySelector('#csvFileInput');
-                const accountSelect = modal.querySelector('#csvAccountSelect');
-                if (fileInput.files.length > 0) {
-                    try {
-                        this.showLoader(true);
-                        await importer.processCSV(fileInput.files[0], accountSelect.value);
-                    } catch (e) {
-                        this.showNotification(e.message, 'error');
-                    } finally {
-                        this.showLoader(false);
-                    }
-                } else {
-                    this.showNotification('Please select a CSV file.', 'error');
-                }
-            } else if (importer.currentStep === 'review') {
-                importer.goToStep('confirm');
-            }
-        });
-
-        modal.querySelector('#csvConfirmBtn').addEventListener('click', async () => {
-            const importer = this.services.csvImporter;
-            try {
-                this.showLoader(true);
-                const result = await importer.importConfirmedTransactions();
-                this.showNotification(`${result.success} transactions imported successfully!`, 'success');
-                modal.classList.add('hidden');
-                await this.app.loadDataAndRender();
-            } catch (e) {
-                this.showNotification(e.message, 'error');
-            } finally {
-                this.showLoader(false);
-            }
-        });
-
-        modal.querySelector('#csvBackBtn').addEventListener('click', () => {
-            const importer = this.services.csvImporter;
-            if (importer.currentStep === 'review') importer.goToStep('upload');
-            if (importer.currentStep === 'confirm') importer.goToStep('review');
+        this.elements.csvImportModal.querySelector('#closeCsvModalBtn').addEventListener('click', () => {
+            this.elements.csvImportModal.classList.add('hidden');
         });
     }
 
     openCsvImportModal() {
-        this.services.csvImporter.reset();
-        this.renderImportStep('upload');
+        this.renderImportStep();
         this.elements.csvImportModal.classList.remove('hidden');
     }
 
-    renderImportStep(step) {
+    renderImportStep() {
         const content = this.elements.csvImportModal.querySelector('#csv-import-content');
-        const nextBtn = this.elements.csvImportModal.querySelector('#csvNextBtn');
-        const confirmBtn = this.elements.csvImportModal.querySelector('#csvConfirmBtn');
-        const backBtn = this.elements.csvImportModal.querySelector('#csvBackBtn');
+        content.innerHTML = `
+            <h4 class="text-lg font-semibold mb-4">Import Transactions</h4>
+            <div class="space-y-4">
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                    <input type="file"
+                           id="csvFileInput"
+                           accept=".csv"
+                           multiple
+                           class="hidden">
+                    <label for="csvFileInput" class="cursor-pointer">
+                        <div class="text-gray-600">
+                            <p class="text-lg mb-2">Drop CSV files here or click to browse</p>
+                            <p class="text-sm">Supports multiple Chase CSV files</p>
+                            <p class="text-xs mt-2">Account will be detected from filename</p>
+                        </div>
+                    </label>
+                </div>
+                <div id="file-list" class="space-y-2"></div>
+            </div>`;
 
-        switch(step) {
-            case 'upload':
-                content.innerHTML = `
-                    <h4 class="text-lg font-semibold mb-4">Step 1: Upload File</h4>
-                    <div class="space-y-4">
-                        <div><label class="block text-sm font-medium mb-1">Select Account to Import Into:</label><select id="csvAccountSelect" class="w-full p-2 border rounded"></select></div>
-                        <div><label class="block text-sm font-medium mb-1">Select CSV File:</label><input type="file" id="csvFileInput" accept=".csv" class="w-full p-2 border rounded"></div>
-                        <div id="csv-loader" class="hidden">Loading...</div>
-                    </div>`;
-                const select = content.querySelector('#csvAccountSelect');
-                this.app.accounts.forEach(acc => {
-                    select.add(new Option(acc.name, acc.id));
-                });
-                nextBtn.classList.remove('hidden');
-                confirmBtn.classList.add('hidden');
-                backBtn.classList.add('hidden');
-                break;
-            case 'review':
-                content.innerHTML = `
-                    <h4 class="text-lg font-semibold mb-4">Step 2: Review Transactions</h4>
-                    <div id="transactionPreview" class="max-h-[50vh] overflow-y-auto"></div>`;
-                content.querySelector('#transactionPreview').innerHTML = this.services.csvImporter.renderTransactionsForReview();
-                nextBtn.classList.remove('hidden');
-                confirmBtn.classList.add('hidden');
-                backBtn.classList.remove('hidden');
-                break;
-            case 'confirm':
-                content.innerHTML = `
-                    <h4 class="text-lg font-semibold mb-4">Step 3: Confirm Import</h4>
-                    <div id="importSummary"></div>`;
-                content.querySelector('#importSummary').innerHTML = this.services.csvImporter.getImportSummaryHTML();
-                nextBtn.classList.add('hidden');
-                confirmBtn.classList.remove('hidden');
-                backBtn.classList.remove('hidden');
-                break;
+        const fileInput = content.querySelector('#csvFileInput');
+        fileInput.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            for (const file of files) {
+                await this.processFile(file);
+            }
+        });
+
+        const dropZone = content.querySelector('.border-dashed');
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('bg-blue-50', 'border-blue-400');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('bg-blue-50', 'border-blue-400');
+        });
+
+        dropZone.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('bg-blue-50', 'border-blue-400');
+
+            const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.csv') || f.name.endsWith('.CSV'));
+
+            for (const file of files) {
+                await this.processFile(file);
+            }
+        });
+    }
+
+    async processFile(file) {
+        const filename = file.name;
+        const accountId = this.services.csvImporter.extractAccountFromFilename(filename);
+
+        if (!accountId) {
+            this.showNotification(`Cannot detect account from filename: ${filename}`, 'error');
+            return;
+        }
+
+        // Show which account was detected
+        this.showNotification(`Processing ${filename} for account ${accountId}`, 'info');
+
+        try {
+            const transactions = await this.services.csvImporter.parseCSV(file, accountId);
+            this.showNotification(`Found ${transactions.length} transactions in ${filename}`, 'success');
+
+            // Auto-categorize
+            const categorized = await this.services.categoryManager.categorizeAll(transactions);
+
+            // Save to database
+            await this.services.dataService.saveTransactionBatch(categorized);
+
+            // Refresh UI
+            await this.app.loadDataAndRender();
+
+        } catch (error) {
+            this.showNotification(`Error processing ${filename}: ${error.message}`, 'error');
         }
     }
 
