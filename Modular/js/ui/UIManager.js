@@ -41,6 +41,12 @@ export class UIManager {
         this.elements.headerButtons.querySelector('#addTransactionBtn').addEventListener('click', () => this.services.enhancedTransactionUI.openAddModal(this.app.accounts));
         this.elements.headerButtons.querySelector('#logoutBtn').addEventListener('click', () => this.services.authService.signOut());
 
+        const aiCategorizeBtn = document.createElement('button');
+        aiCategorizeBtn.id = 'aiCategorizeBtn';
+        aiCategorizeBtn.className = 'bg-purple-600 text-white px-4 py-2 rounded-lg';
+        aiCategorizeBtn.textContent = 'AI Categorize Uncategorized';
+        this.elements.headerButtons.insertBefore(aiCategorizeBtn, this.elements.headerButtons.querySelector('#logoutBtn'));
+
         // Create and add the Settings button programmatically
         const settingsBtn = document.createElement('button');
         settingsBtn.id = 'settingsBtn';
@@ -284,6 +290,14 @@ export class UIManager {
                     <p class="text-sm text-gray-500">${new Date(transaction.date + 'T00:00:00').toLocaleDateString()} | ${categoryDisplay}</p>
                 </div>
                 <div class="flex items-center space-x-4">
+                    <select class="quick-category ml-2 text-sm" data-id="${transaction.id}">
+                       <option value="">Change Category...</option>
+                       <option value="Real Estate Income">Rent Income</option>
+                       <option value="Personal Income">Lisa's Income</option>
+                       <option value="Transfer">Transfer</option>
+                       <option value="Mortgage">Mortgage</option>
+                       <option value="Utilities">Utilities</option>
+                    </select>
                     <span class="font-mono ${amountColor}">${formattedAmount}</span>
                     <button data-id="${transaction.id}" class="edit-btn text-gray-400 hover:text-blue-500" title="Edit Transaction">
                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.536L16.732 3.732z"></path></svg>
