@@ -1,0 +1,93 @@
+{
+  "summary": {
+    "totalLines": 33004,
+    "totalFiles": 52,
+    "avgLinesPerFile": 635
+  },
+  "byFileType": {
+    ".md": 414,
+    ".html": 5664,
+    ".js": 4422,
+    ".css": 175,
+    ".json": 22329
+  },
+  "byDirectory": {
+    "Modular": 16370,
+    ".": 7540,
+    "docs": 162,
+    "functions": 8034,
+    "public": 745,
+    "scripts": 153
+  },
+  "largestFiles": [
+    {
+      "path": "Modular/package-lock.json",
+      "lines": 9940,
+      "codeLines": 9939,
+      "size": "349.48 KB"
+    },
+    {
+      "path": "functions/package-lock.json",
+      "lines": 7926,
+      "codeLines": 7925,
+      "size": "278.78 KB"
+    },
+    {
+      "path": "package-lock.json",
+      "lines": 4320,
+      "codeLines": 4319,
+      "size": "151.21 KB"
+    },
+    {
+      "path": "enhanced_finance_tracker.html",
+      "lines": 1547,
+      "codeLines": 1321,
+      "size": "76.91 KB"
+    },
+    {
+      "path": "personal_finance_tracker.html",
+      "lines": 1547,
+      "codeLines": 1321,
+      "size": "76.91 KB"
+    },
+    {
+      "path": "Modular/archive/complete_index_html.html",
+      "lines": 1021,
+      "codeLines": 842,
+      "size": "49.15 KB"
+    },
+    {
+      "path": "Modular/archive/indexold2.html",
+      "lines": 951,
+      "codeLines": 784,
+      "size": "45.50 KB"
+    },
+    {
+      "path": "public/app.js",
+      "lines": 586,
+      "codeLines": 442,
+      "size": "22.48 KB"
+    },
+    {
+      "path": "Modular/js/ui/UIManager.js",
+      "lines": 397,
+      "codeLines": 320,
+      "size": "19.70 KB"
+    },
+    {
+      "path": "Modular/js/categorization/CategoryManager.js",
+      "lines": 332,
+      "codeLines": 267,
+      "size": "12.34 KB"
+    }
+  ],
+  "complexity": {
+    "functions": 130,
+    "classes": 30,
+    "imports": 18,
+    "exports": 27,
+    "asyncFunctions": 56,
+    "conditionals": 168,
+    "loops": 84
+  }
+}
