@@ -13,17 +13,19 @@ export class MonthlyDashboard {
 
     async calculateMonthlyMetrics() {
         const transactions = await this.dataService.loadTransactions(500);
-        const currentMonth = new Date().getMonth();
-        const currentYear = new Date().getFullYear();
 
-        // Filter current month transactions
-        const monthlyTrans = transactions.filter(t => {
-            const date = new Date(t.date);
-            return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+        // To: Show last 4 months of data
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 4);
+
+        const recentTransactions = transactions.filter(t => {
+            const txDate = new Date(t.date);
+            return txDate >= startDate && txDate <= endDate;
         });
 
         // Separate by entity
-        const realEstate = monthlyTrans.filter(t => t.entity === 'Real Estate');
+        const realEstate = recentTransactions.filter(t => t.entity === 'Real Estate');
         const techBusiness = monthlyTrans.filter(t => t.entity === 'Tech Business');
         const personal = monthlyTrans.filter(t => t.entity === 'Personal');
 

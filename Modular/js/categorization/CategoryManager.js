@@ -63,6 +63,23 @@ export class CategoryManager {
 
     // This is the new, prioritized categorization flow
     categorizeTransaction(transaction) {
+        const descLower = transaction.description.toLowerCase();
+        // Add BEFORE account-based checks
+        // Detect Tech Business by description patterns
+        if ((descLower.includes('packerthomas') ||
+             descLower.includes('audit') ||
+             descLower.includes('consulting')) &&
+            transaction.amount > 5000) { // Tech payments are usually large
+            return {
+                category: 'Tech Business Income',
+                subcategory: 'Consulting',
+                entity: 'Tech Business',
+                property: null,
+                confidence: 0.95,
+                method: 'tech_pattern_match'
+            };
+        }
+
         // Special rule for Lisa's income
         if (transaction.accountId === '0111' && transaction.amount === 1500) {
            const desc = transaction.description.toLowerCase();

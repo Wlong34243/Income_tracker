@@ -97,6 +97,32 @@
                 console.log('Transactions:', this.app?.transactions?.length || 0);
                 console.groupEnd();
             }
+
+            async checkDataIntegrity() {
+                const transactions = await this.app.dataService.loadTransactions(1000);
+
+                // Group by account
+                const byAccount = {};
+                transactions.forEach(t => {
+                    if (!byAccount[t.accountId]) {
+                        byAccount[t.accountId] = { count: 0, total: 0 };
+                    }
+                    byAccount[t.accountId].count++;
+                    byAccount[t.accountId].total += t.amount;
+                });
+
+                console.table(byAccount);
+
+                // Check Tech Business specifically
+                const techTransactions = transactions.filter(t =>
+                    t.entity === 'Tech Business' ||
+                    t.accountId === '7991' ||
+                    t.description?.toLowerCase().includes('packer')
+                );
+
+                console.log('Tech Business Transactions:', techTransactions.length);
+                console.table(techTransactions.slice(0, 5));
+            }
         }
 
         class App {
