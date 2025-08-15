@@ -64,6 +64,22 @@ export class UIManager {
         aiCategorizeBtn.textContent = 'AI Categorize Uncategorized';
         this.elements.headerButtons.insertBefore(aiCategorizeBtn, this.elements.headerButtons.querySelector('#logoutBtn'));
 
+        aiCategorizeBtn.addEventListener('click', async () => {
+            aiCategorizeBtn.disabled = true;
+            aiCategorizeBtn.textContent = 'Categorizing...';
+            try {
+                const count = await this.app.runAiCategorization();
+                this.showNotification(`Successfully categorized ${count} transactions.`, 'success');
+                await this.app.loadDataAndRender();
+            } catch (error) {
+                console.error('AI Categorization failed:', error);
+                this.showNotification('AI Categorization failed. See console for details.', 'error');
+            } finally {
+                aiCategorizeBtn.disabled = false;
+                aiCategorizeBtn.textContent = 'AI Categorize Uncategorized';
+            }
+        });
+
         // Create and add the Settings button programmatically
         const settingsBtn = document.createElement('button');
         settingsBtn.id = 'settingsBtn';
@@ -122,15 +138,6 @@ export class UIManager {
                 e.target.value = '';
             }
         });
-
-        const quickActionsToggle = document.getElementById('quick-actions-toggle');
-        const quickActionsMenu = document.getElementById('quick-actions-menu');
-        if (quickActionsToggle && quickActionsMenu) {
-            quickActionsToggle.addEventListener('click', () => {
-                quickActionsMenu.classList.toggle('hidden');
-                quickActionsMenu.classList.toggle('flex');
-            });
-        }
 
         const quickActionsToggle = document.getElementById('quick-actions-toggle');
         const quickActionsMenu = document.getElementById('quick-actions-menu');

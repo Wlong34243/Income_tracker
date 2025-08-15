@@ -103,6 +103,7 @@
             constructor() {
                 this.authService = null;
                 this.dataService = null;
+                this.geminiService = null;
                 this.uiManager = null;
                 this.categoryIntegration = null;
                 this.settingsManager = null;
@@ -209,6 +210,31 @@
                     this.uiManager.showNotification('No transactions to export.', 'warning');
                 }
             }
+
+            async runAiCategorization() {
+                const uncategorized = this.transactions.filter(t => t.category === 'Uncategorized');
+
+                if (uncategorized.length === 0) {
+                    this.uiManager.showNotification('No transactions to categorize.', 'info');
+                    return 0;
+                }
+
+                const suggestions = await this.geminiService.batchCategorize(uncategorized);
+                let successCount = 0;
+
+                for (const { transaction, suggestion } of suggestions) {
+                    if (suggestion && suggestion.category !== 'Uncategorized') {
+                        await this.dataService.updateTransaction(transaction.id, {
+                            category: suggestion.category,
+                            subcategory: suggestion.subcategory,
+                            entity: suggestion.entity
+                        });
+                        successCount++;
+                    }
+                }
+
+                return successCount;
+            }
         }
 
         async function main() {
@@ -253,6 +279,7 @@
 
             // Step 6: Fully configure the app controller with all its dependencies.
             app.authService = authService;
+            app.geminiService = geminiService;
             app.uiManager = uiManager;
             app.settingsManager = settingsManager;
             app.categoryIntegration = integrationServices; // Add the integration services to the app
