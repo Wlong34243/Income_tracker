@@ -64,19 +64,20 @@ export class CategoryManager {
     // This is the new, prioritized categorization flow
     categorizeTransaction(transaction) {
         const descLower = transaction.description.toLowerCase();
-        // Add BEFORE account-based checks
-        // Detect Tech Business by description patterns
-        if ((descLower.includes('packerthomas') ||
-             descLower.includes('audit') ||
-             descLower.includes('consulting')) &&
-            transaction.amount > 5000) { // Tech payments are usually large
+        // PRIORITY 0: Detect Tech Business by amount and description patterns
+        // PackerThomas payments are large (>$10k) and go to various accounts
+        if (transaction.amount > 10000 &&
+            (descLower.includes('packer') ||
+             descLower.includes('thomas') ||
+             descLower.includes('deposit'))) {
+            console.log('Detected Tech Business income:', transaction.description);
             return {
                 category: 'Tech Business Income',
                 subcategory: 'Consulting',
                 entity: 'Tech Business',
                 property: null,
-                confidence: 0.95,
-                method: 'tech_pattern_match'
+                confidence: 0.98,
+                method: 'large_deposit_pattern'
             };
         }
 

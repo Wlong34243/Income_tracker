@@ -261,6 +261,29 @@
 
                 return successCount;
             }
+
+            async fixTechBusinessTransactions() {
+                // Find all large deposits that should be Tech Business
+                const transactions = await this.dataService.loadTransactions(1000);
+                let fixed = 0;
+
+                for (const t of transactions) {
+                    if (t.amount > 10000 && !t.entity) {
+                        await this.dataService.updateTransaction(t.id, {
+                            category: 'Tech Business Income',
+                            subcategory: 'Consulting',
+                            entity: 'Tech Business',
+                            accountId: '7991'
+                        });
+                        fixed++;
+                    }
+                }
+
+                console.log(`Fixed ${fixed} Tech Business transactions`);
+                if (fixed > 0) {
+                    setTimeout(() => location.reload(), 1000);
+                }
+            }
         }
 
         async function main() {

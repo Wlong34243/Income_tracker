@@ -14,19 +14,15 @@ export class MonthlyDashboard {
     async calculateMonthlyMetrics() {
         const transactions = await this.dataService.loadTransactions(500);
 
-        // To: Show last 4 months of data
-        const endDate = new Date();
-        const startDate = new Date();
-        startDate.setMonth(startDate.getMonth() - 4);
+        // Show ALL transactions (April through August 2025)
+        // User has 4 months of imported data
+        const currentMonthTransactions = transactions; // Use ALL transactions, no date filter
 
-        const recentTransactions = transactions.filter(t => {
-            const txDate = new Date(t.date);
-            return txDate >= startDate && txDate <= endDate;
-        });
+        console.log(`Dashboard using ${currentMonthTransactions.length} transactions`);
 
         // Separate by entity
-        const realEstate = recentTransactions.filter(t => t.entity === 'Real Estate');
-        const techBusiness = monthlyTrans.filter(t => t.entity === 'Tech Business');
+        const realEstate = currentMonthTransactions.filter(t => t.entity === 'Real Estate');
+        const techBusiness = currentMonthTransactions.filter(t => t.entity === 'Tech Business');
         const personal = monthlyTrans.filter(t => t.entity === 'Personal');
 
         // Calculate expected vs actual rent
