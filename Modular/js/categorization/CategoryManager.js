@@ -48,10 +48,28 @@ export class CategoryManager {
     categorizeTransaction(transaction) {
         const descLower = transaction.description.toLowerCase();
         
+        // PRIORITY 0: Detect Tech Business by amount and description patterns
+        // PackerThomas payments are large (>$10k) and go to various accounts
+        if (transaction.amount > 10000 &&
+            (descLower.includes('packer') ||
+             descLower.includes('thomas') ||
+             (descLower.includes('deposit') && transaction.accountId === '7991'))) {
+            console.log('Detected Tech Business income:', transaction.description);
+            return {
+                category: 'Tech Business Income',
+                subcategory: 'Consulting',
+                entity: 'Tech Business',
+                property: null,
+                confidence: 0.98,
+                method: 'large_deposit_pattern'
+            };
+        }
+        
         // PRIORITY 1: Lisa's income special case
         if (transaction.accountId === '0111' && 
             Math.abs(transaction.amount - 1500) < 10 &&
-            descLower.includes('michael katzen')) {
+            (descLower.includes('michael katzen') || 
+             (descLower.includes('deposit') && descLower.includes('927579')))) {
             return {
                 category: 'Personal Income',
                 subcategory: "Lisa's Monthly Income",

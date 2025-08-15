@@ -104,17 +104,11 @@ export class UIManager {
             });
         }
 
-        const logoutBtn = this.elements.headerButtons?.querySelector('#logoutBtn');
-        if (logoutBtn && this.services.authService) {
-            logoutBtn.addEventListener('click', () => this.services.authService.signOut());
-        }
-
-        // --- ADDED BACK ---
-        // Add AI Categorize button and its event listener
+        // Add AI Categorize button
         if (this.elements.headerButtons && !document.getElementById('aiCategorizeBtn')) {
             const aiCategorizeBtn = document.createElement('button');
             aiCategorizeBtn.id = 'aiCategorizeBtn';
-            aiCategorizeBtn.className = 'bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition';
+            aiCategorizeBtn.className = 'bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition flex items-center gap-2 text-sm';
             aiCategorizeBtn.textContent = 'AI Categorize';
             
             aiCategorizeBtn.addEventListener('click', async () => {
@@ -128,7 +122,7 @@ export class UIManager {
                             await this.app.loadDataAndRender();
                         }
                     } catch (error) {
-                        this.showNotification('An error occurred during AI categorization.', 'error');
+                        this.showNotification('AI Categorization failed. See console for details.', 'error');
                         console.error("AI categorization failed:", error);
                     } finally {
                         aiCategorizeBtn.disabled = false;
@@ -144,7 +138,6 @@ export class UIManager {
                 this.elements.headerButtons.appendChild(aiCategorizeBtn);
             }
         }
-        // --- END ADDED BACK ---
 
         // Add Settings button
         if (this.elements.headerButtons && !document.getElementById('settingsBtn')) {
@@ -160,6 +153,11 @@ export class UIManager {
             } else {
                 this.elements.headerButtons.appendChild(settingsBtn);
             }
+        }
+
+        const logoutBtn = this.elements.headerButtons?.querySelector('#logoutBtn');
+        if (logoutBtn && this.services.authService) {
+            logoutBtn.addEventListener('click', () => this.services.authService.signOut());
         }
 
         // Transaction list event delegation
@@ -203,7 +201,7 @@ export class UIManager {
             });
         }
 
-        // Quick Actions Toggle
+        // Quick Actions Toggle (if these elements exist)
         const quickActionsToggle = document.getElementById('quick-actions-toggle');
         const quickActionsMenu = document.getElementById('quick-actions-menu');
         if (quickActionsToggle && quickActionsMenu) {

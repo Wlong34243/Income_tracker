@@ -13,7 +13,9 @@ export class MonthlyDashboard {
             '37th Ave E': { tenants: ['pablo joaquin'], expectedRent: 1350 },
             '2nd St W': { tenants: ['wendy cordova', 'geron vile'], expectedRent: 2900 },
             '1112 36th St W': { tenants: ['michelle ruth', 'steven malloy'], expectedRent: 3200 },
-            '59th Ave E': { tenants: ['claribel castillomero', 'belem amaro'], expectedRent: 3100 }
+            '59th Ave E': { tenants: ['claribel castillomero', 'belem amaro'], expectedRent: 3100 },
+            '61st Ave Ter E': { tenants: [], expectedRent: 3200 },
+            'Harbor St': { tenants: [], expectedRent: 900 }
         };
     }
 
@@ -38,6 +40,8 @@ export class MonthlyDashboard {
             return txDate >= startOfMonth && txDate <= endOfMonth;
         });
         
+        console.log(`Dashboard showing ${currentMonthTransactions.length} transactions for ${now.toLocaleString('default', { month: 'long', year: 'numeric' })}`);
+        
         // Separate by entity (excluding transfers)
         const realEstate = currentMonthTransactions.filter(t => 
             t.entity === 'Real Estate' && t.category !== 'Transfer'
@@ -50,32 +54,9 @@ export class MonthlyDashboard {
         );
         
         // Calculate ACTUAL metrics (not hardcoded!)
-        const realEstateMetrics = {
-            income: realEstate.filter(t => t.amount > 0)
-                .reduce((sum, t) => sum + t.amount, 0),
-            expenses: realEstate.filter(t => t.amount < 0)
-                .reduce((sum, t) => sum + Math.abs(t.amount), 0),
-            net: 0
-        };
-        realEstateMetrics.net = realEstateMetrics.income - realEstateMetrics.expenses;
-        
-        const techBusinessMetrics = {
-            income: techBusiness.filter(t => t.amount > 0)
-                .reduce((sum, t) => sum + t.amount, 0),
-            expenses: techBusiness.filter(t => t.amount < 0)
-                .reduce((sum, t) => sum + Math.abs(t.amount), 0),
-            net: 0
-        };
-        techBusinessMetrics.net = techBusinessMetrics.income - techBusinessMetrics.expenses;
-        
-        const personalMetrics = {
-            income: personal.filter(t => t.amount > 0)
-                .reduce((sum, t) => sum + t.amount, 0),
-            expenses: personal.filter(t => t.amount < 0)
-                .reduce((sum, t) => sum + Math.abs(t.amount), 0),
-            net: 0
-        };
-        personalMetrics.net = personalMetrics.income - personalMetrics.expenses;
+        const realEstateMetrics = this.calculateEntityMetrics(realEstate);
+        const techBusinessMetrics = this.calculateEntityMetrics(techBusiness);
+        const personalMetrics = this.calculateEntityMetrics(personal);
         
         // Combined business metrics (Real Estate + Tech only, not Personal)
         const combinedBusiness = {
@@ -101,7 +82,8 @@ export class MonthlyDashboard {
                 amount: combinedBusiness.net,
                 target: this.targetMonthlyNet,
                 percentage: (combinedBusiness.net / this.targetMonthlyNet * 100)
-            }
+            },
+            recurringDue: [] // Placeholder for future RecurringTemplates feature
         };
     }
 
@@ -125,28 +107,15 @@ export class MonthlyDashboard {
     calculatePropertyPerformance(realEstateTransactions) {
         const performance = {};
         
-        // Initialize all properties with ACTUAL expected rents
-        const propertyExpectedRents = {
-            '5th ST E': 3000,
-            '2024 50th': 2800,
-            'Las Palmas': 1250,
-            '37th Ave E': 1350,
-            '2nd St W': 2900,
-            '1112 36th St W': 3200,
-            '59th Ave E': 3100,
-            '61st Ave Ter E': 3200,
-            'Harbor St': 900
-        };
-        
-        // Initialize performance tracking
-        Object.keys(propertyExpectedRents).forEach(property => {
+        // Initialize all properties from propertyConfig
+        Object.entries(this.propertyConfig).forEach(([property, config]) => {
             performance[property] = {
                 income: 0,
                 expenses: 0,
                 net: 0,
-                expected: propertyExpectedRents[property],
+                expected: config.expectedRent,
                 received: false,
-                tenants: this.propertyConfig[property]?.tenants || []
+                tenants: config.tenants
             };
         });
         
@@ -212,7 +181,7 @@ export class MonthlyDashboard {
                 return config.tenants.some(tenant => desc.includes(tenant));
             });
             
-            if (!received) {
+            if (!received && config.tenants.length > 0) { // Only flag if property has tenants
                 missingProperties.push(property);
             }
         });
@@ -222,7 +191,7 @@ export class MonthlyDashboard {
             received: totalReceived,
             missing: totalExpected - totalReceived,
             missingProperties,
-            collectionRate: totalReceived > 0 ? (totalReceived / totalExpected * 100) : 0
+            collectionRate: totalExpected > 0 ? (totalReceived / totalExpected * 100) : 0
         };
     }
 
