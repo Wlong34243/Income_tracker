@@ -71,6 +71,7 @@
         import { UIManager } from './js/ui/UIManager.js';
         import { SettingsManager } from './js/settings/SettingsManager.js';
         import { NotificationManager } from './js/ui/NotificationManager.js';
+        import { QuickActions } from './js/ui/QuickActions.js';
 
         // Main Integration Layer
         import { CategoryIntegration } from './js/integration/CategoryIntegration.js';
@@ -258,6 +259,8 @@
 
             // Step 7: Initialize the app's main logic (auth listener, data loading).
             app.init();
+
+            document.body.insertAdjacentHTML('beforeend', QuickActions.render());
 
             console.log("Finance Tracker Initialized");
             

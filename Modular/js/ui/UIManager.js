@@ -1,5 +1,7 @@
 import { sanitizeHTML } from '../utils/Sanitizer.js';
-import { DashboardUI } from './DashboardUI.js';
+import { MonthlyDashboard } from './MonthlyDashboard.js';
+import { RecurringTemplates } from '../data/RecurringTemplates.js';
+import { RentTracker } from '../analytics/RentTracker.js';
 
 export class UIManager {
     constructor(services) {
@@ -18,6 +20,10 @@ export class UIManager {
             csvImportModal: null,
             settingsModal: null,
         };
+
+        this.monthlyDashboard = new MonthlyDashboard(services.dataService, services.categoryManager);
+        this.recurringTemplates = new RecurringTemplates(services.dataService);
+        this.rentTracker = new RentTracker(services.dataService, services.categoryManager);
     }
 
     init(appController) {
@@ -73,6 +79,15 @@ export class UIManager {
                 const transaction = this.app.transactions.find(t => t.id === editBtn.dataset.id);
                 if (transaction) this.services.enhancedTransactionUI.openEditPanel(transaction);
             }
+
+            const quickAddBtn = e.target.closest('.quick-add-recurring');
+            if(quickAddBtn) {
+                const templateId = quickAddBtn.dataset.id;
+                this.recurringTemplates.quickAddTransaction(templateId).then(() => {
+                    this.app.loadDataAndRender();
+                    this.showNotification('Recurring transaction added.', 'success');
+                });
+            }
         });
 
         // Add handler for quick category changes
@@ -107,6 +122,24 @@ export class UIManager {
                 e.target.value = '';
             }
         });
+
+        const quickActionsToggle = document.getElementById('quick-actions-toggle');
+        const quickActionsMenu = document.getElementById('quick-actions-menu');
+        if (quickActionsToggle && quickActionsMenu) {
+            quickActionsToggle.addEventListener('click', () => {
+                quickActionsMenu.classList.toggle('hidden');
+                quickActionsMenu.classList.toggle('flex');
+            });
+        }
+
+        const quickActionsToggle = document.getElementById('quick-actions-toggle');
+        const quickActionsMenu = document.getElementById('quick-actions-menu');
+        if (quickActionsToggle && quickActionsMenu) {
+            quickActionsToggle.addEventListener('click', () => {
+                quickActionsMenu.classList.toggle('hidden');
+                quickActionsMenu.classList.toggle('flex');
+            });
+        }
     }
 
     // --- Settings Modal ---
@@ -287,8 +320,29 @@ export class UIManager {
         this.services.authService.renderAuthUI(this.elements.authContainer);
     }
 
-    renderDashboard(report) {
-        DashboardUI.render(report, this.elements.dashboardContainer);
+    async renderDashboard(report) {
+        // Use the new monthly dashboard instead
+        await this.monthlyDashboard.render(this.elements.dashboardContainer);
+    }
+
+    quickAddRent() {
+        console.log('Quick Add Rent clicked');
+        // This would open a simplified modal for adding a rent payment
+        this.showNotification('Quick Add Rent feature not fully implemented.', 'info');
+    }
+
+    quickAddExpense() {
+        console.log('Quick Add Expense clicked');
+        // This would open a simplified modal for adding an expense
+        this.showNotification('Quick Add Expense feature not fully implemented.', 'info');
+    }
+
+    async checkRentStatus() {
+        console.log('Check Rent Status clicked');
+        const status = await this.rentTracker.checkCurrentMonthStatus();
+        // This would display the status in a dedicated modal or view
+        console.log('Rent Status:', status);
+        this.showNotification(`Rent Collection: ${status.collectionRate}%`, 'info');
     }
 
     renderTransactionList(transactions) {
