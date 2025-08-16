@@ -23,6 +23,7 @@ export class UIManager {
         this.monthlyDashboard = null;
         this.recurringTemplates = null;
         this.rentTracker = null;
+        this.transactionSearch = null;
     }
 
     async loadDashboardComponents() {
@@ -81,6 +82,24 @@ export class UIManager {
                     this.showNotification('Add transaction feature loading...', 'info');
                 }
             });
+        }
+
+        // Add Search & Edit tab button
+        if (this.elements.headerButtons && !document.getElementById('searchTransactionsBtn')) {
+            const searchBtn = document.createElement('button');
+            searchBtn.id = 'searchTransactionsBtn';
+            searchBtn.className = 'bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition flex items-center gap-2 text-sm';
+            searchBtn.innerHTML = '🔍 Search & Edit';
+
+            searchBtn.addEventListener('click', () => {
+                this.showSearchInterface();
+            });
+
+            // Insert after Import button
+            const importBtn = this.elements.headerButtons.querySelector('#importTransactionsBtn');
+            if (importBtn && importBtn.nextSibling) {
+                this.elements.headerButtons.insertBefore(searchBtn, importBtn.nextSibling);
+            }
         }
 
         // Create and add export button
@@ -510,5 +529,36 @@ export class UIManager {
         } else {
             this.showNotification('Rent tracker not available', 'warning');
         }
+    }
+
+    async showSearchInterface() {
+        if (!this.transactionSearch) {
+            const { TransactionSearch } = await import('./TransactionSearch.js');
+            this.transactionSearch = new TransactionSearch(this.services.dataService, this.services.categoryManager);
+        }
+
+        // Hide dashboard and show search
+        this.elements.dashboardContainer.style.display = 'none';
+        this.elements.transactionsContainer.innerHTML = '';
+
+        // Create search container if it doesn't exist
+        let searchContainer = document.getElementById('search-container');
+        if (!searchContainer) {
+            searchContainer = document.createElement('div');
+            searchContainer.id = 'search-container';
+            this.elements.dashboardContainer.parentNode.insertBefore(searchContainer, this.elements.dashboardContainer);
+        }
+
+        searchContainer.style.display = 'block';
+        this.transactionSearch.render(searchContainer);
+    }
+
+    showDashboard() {
+        const searchContainer = document.getElementById('search-container');
+        if (searchContainer) {
+            searchContainer.style.display = 'none';
+        }
+        this.elements.dashboardContainer.style.display = 'block';
+        this.app.loadDataAndRender();
     }
 }
