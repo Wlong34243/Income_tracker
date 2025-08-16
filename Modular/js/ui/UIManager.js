@@ -160,6 +160,24 @@ export class UIManager {
             logoutBtn.addEventListener('click', () => this.services.authService.signOut());
         }
 
+        // Add Search button
+        if (this.elements.headerButtons && !document.getElementById('searchBtn')) {
+            const searchBtn = document.createElement('button');
+            searchBtn.id = 'searchBtn';
+            searchBtn.className = 'bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition flex items-center gap-2 text-sm';
+            searchBtn.innerHTML = '🔍 Search';
+
+            searchBtn.addEventListener('click', () => {
+                this.showSearchInterface();
+            });
+
+            // Insert after Import button
+            const importBtn = this.elements.headerButtons.querySelector('#importTransactionsBtn');
+            if (importBtn && importBtn.nextSibling) {
+                this.elements.headerButtons.insertBefore(searchBtn, importBtn.nextSibling);
+            }
+        }
+
         // Transaction list event delegation
         if (this.elements.transactionsContainer) {
             this.elements.transactionsContainer.addEventListener('click', e => {
@@ -370,15 +388,24 @@ export class UIManager {
             const transactions = await this.services.csvImporter.parseCSV(file, accountId);
             this.showNotification(`Found ${transactions.length} transactions in ${filename}`, 'success');
 
-            if (this.services.categoryManager) {
-                const categorized = await this.services.categoryManager.categorizeAll(transactions);
-                await this.services.dataService.saveTransactionBatch(categorized);
-            } else {
-                await this.services.dataService.saveTransactionBatch(transactions);
-            }
+            // Process and save transactions
+            const processedTransactions = await this.services.csvImporter.processTransactions(transactions, filename);
 
-            await this.app.loadDataAndRender();
+            if (processedTransactions.length > 0) {
+                await this.services.dataService.saveTransactionBatch(processedTransactions);
+
+                // Reload the dashboard
+                await this.app.loadDataAndRender();
+
+                // CLOSE THE MODAL - THIS WAS MISSING
+                if (this.elements.csvImportModal) {
+                    this.elements.csvImportModal.classList.add('hidden');
+                }
+
+                this.showNotification(`Successfully imported ${processedTransactions.length} transactions`, 'success');
+            }
         } catch (error) {
+            console.error('Import error:', error);
             this.showNotification(`Error processing ${filename}: ${error.message}`, 'error');
         }
     }
@@ -510,5 +537,37 @@ export class UIManager {
         } else {
             this.showNotification('Rent tracker not available', 'warning');
         }
+    }
+
+    async showSearchInterface() {
+        if (!this.transactionSearch) {
+            const { TransactionSearch } = await import('./TransactionSearch.js');
+            this.transactionSearch = new TransactionSearch(this.services.dataService, this.services.categoryManager);
+            await this.transactionSearch.init();
+        }
+
+        // Hide dashboard
+        this.elements.dashboardContainer.style.display = 'none';
+        this.elements.transactionsContainer.style.display = 'none';
+
+        // Create or show search container
+        let searchContainer = document.getElementById('search-container');
+        if (!searchContainer) {
+            searchContainer = document.createElement('div');
+            searchContainer.id = 'search-container';
+            this.elements.dashboardContainer.parentNode.appendChild(searchContainer);
+        }
+
+        this.transactionSearch.render(searchContainer);
+    }
+
+    showDashboard() {
+        const searchContainer = document.getElementById('search-container');
+        if (searchContainer) {
+            searchContainer.innerHTML = '';
+        }
+        this.elements.dashboardContainer.style.display = 'block';
+        this.elements.transactionsContainer.style.display = 'block';
+        this.app.loadDataAndRender();
     }
 }
