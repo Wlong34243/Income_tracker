@@ -21,7 +21,8 @@
 <body class="bg-gray-50 min-h-screen font-sans">
     
     <div id="authContainer">
-        </div>
+        <!-- Auth UI will be rendered here by AuthService -->
+    </div>
 
     <div id="mainApp" class="hidden">
         <header class="bg-white shadow-md">
@@ -46,6 +47,7 @@
         </main>
     </div>
 
+    <!-- Modals and Side Panels will be managed by their respective UI components -->
     <div id="modal-container"></div>
     <div id="editor-container"></div>
     <div id="notification-container" class="fixed bottom-5 right-5 z-50"></div>
@@ -70,12 +72,16 @@
         import { UIManager } from './js/ui/UIManager.js';
         import { SettingsManager } from './js/settings/SettingsManager.js';
         import { NotificationManager } from './js/ui/NotificationManager.js';
+        import { QuickActions } from './js/ui/QuickActions.js';
 
         // Main Integration Layer
         import { CategoryIntegration } from './js/integration/CategoryIntegration.js';
         
-        // Analytics
+        // Utilities & Analytics
+        import { TransferMatcher } from './js/utils/TransferMatcher.js';
         import { BusinessAnalytics } from './js/analytics/BusinessAnalytics.js';
+        import { DataExporter } from './js/export/DataExporter.js';
+        window.DataExporter = DataExporter;
 
         // Add debugging directly here instead
         class QuickDebug {
@@ -118,64 +124,6 @@
                 console.log('Tech Business Transactions:', techTransactions.length);
                 console.table(techTransactions.slice(0, 5));
             }
-
-            async standardizeDates() {
-                const dataService = this.app.dataService;
-                if (!dataService || !dataService.db) {
-                    console.error('DataService not available');
-                    return;
-                }
-                
-                const userId = this.app.authService.currentUser?.uid;
-                if (!userId) {
-                    console.error('User not logged in. Cannot standardize dates.');
-                    return;
-                }
-                
-                try {
-                    const { collection, getDocs, writeBatch } = dataService.firestore;
-                    const transactionsRef = collection(dataService.db, 'users', userId, 'transactions');
-                    const snapshot = await getDocs(transactionsRef);
-                    
-                    const batch = writeBatch(dataService.db);
-                    let fixed = 0;
-                    
-                    snapshot.docs.forEach(doc => {
-                        const data = doc.data();
-                        let needsUpdate = false;
-                        let updates = {};
-                        
-                        if (data.date && data.date.includes('/')) {
-                            const parts = data.date.split('/');
-                            if (parts.length === 3) {
-                                const [month, day, year] = parts;
-                                const fullYear = year.length === 2 ? '20' + year : year;
-                                updates.date = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                                needsUpdate = true;
-                                console.log(`Fixing date: ${data.date} -> ${updates.date}`);
-                            }
-                        }
-                        
-                        if (needsUpdate) {
-                            batch.update(doc.ref, updates);
-                            fixed++;
-                        }
-                    });
-                    
-                    if (fixed > 0) {
-                        await batch.commit();
-                        console.log(`✅ Fixed ${fixed} transactions`);
-                        this.app.uiManager.showNotification(`Fixed ${fixed} transaction dates. Reloading...`, "success");
-                        setTimeout(() => location.reload(), 1500);
-                    } else {
-                        console.log('No transactions needed date fixes');
-                        this.app.uiManager.showNotification('All transaction dates are in the correct format.', 'info');
-                    }
-                } catch (error) {
-                    console.error('Error standardizing dates:', error);
-                    this.app.uiManager.showNotification('Failed to fix transaction dates.', 'error');
-                }
-            }
         }
 
         class App {
@@ -188,41 +136,23 @@
                 this.settingsManager = null;
                 this.transactions = [];
                 this.accounts = [];
-                this.config = AppConfig;
+                this.config = AppConfig; // Make config available to integrations
             }
 
-            async init() {
-                await this.uiManager.init(this);
+            init() {
+                this.uiManager.init(this);
                 this.settingsManager.init(this.uiManager);
 
                 this.authService.onAuthStateChanged(async (user) => {
                     if (user) {
                         this.uiManager.showMainApp(user);
+                        // Ensure default accounts exist
+                        await app.dataService.ensureDefaultAccounts();
                         await this.loadDataAndRender();
                     } else {
                         this.uiManager.showAuth();
                     }
                 });
-            }
-
-            async renderDashboard() {
-                try {
-                    if (this.uiManager?.monthlyDashboard) {
-                        await this.uiManager.monthlyDashboard.render(
-                            document.getElementById('dashboard-container')
-                        );
-                        console.log('✅ MonthlyDashboard rendered');
-                    } else {
-                        console.error('❌ MonthlyDashboard not available');
-                        document.getElementById('dashboard-container').innerHTML = `
-                            <div class="bg-red-100 p-4 rounded">
-                                <p>Dashboard component failed to load. Check UIManager.js initialization.</p>
-                            </div>
-                        `;
-                    }
-                } catch (error) {
-                    console.error('Dashboard render error:', error);
-                }
             }
 
             async loadDataAndRender() {
@@ -234,8 +164,17 @@
                     
                     console.log(`Loaded ${this.accounts.length} accounts and ${this.transactions.length} transactions.`);
                     
-                    await this.renderDashboard();
-                    
+                    // Match transfers after loading
+                    const transferPairs = TransferMatcher.findTransferPairs(this.transactions);
+                    if (transferPairs.length > 0) {
+                        console.log(`Found ${transferPairs.length} transfer pairs.`);
+                    }
+
+                    // Generate the business analytics report
+                    const analytics = new BusinessAnalytics(this.transactions);
+                    const report = analytics.generateReport();
+
+                    this.uiManager.renderDashboard(report);
                     this.uiManager.renderTransactionList(this.transactions);
 
                 } catch (error) {
@@ -245,28 +184,44 @@
             }
 
             async addTransaction(data) {
-                await this.dataService.addTransaction(data);
-                this.uiManager.showNotification("Transaction added successfully.", "success");
-                await this.loadDataAndRender();
+                // FIX APPLIED: Changed addTransaction to saveTransaction
+                try {
+                    const newTransaction = await this.dataService.saveTransaction(data);
+                    this.transactions.unshift(newTransaction);
+                    this.uiManager.renderTransactionList(this.transactions);
+                    this.uiManager.showNotification("Transaction added successfully.", "success");
+                } catch (error) {
+                    console.error("Failed to add transaction:", error);
+                    this.uiManager.showNotification(error.message, "error");
+                }
             }
 
             async updateTransaction(data) {
-                await this.dataService.updateTransaction(data.id, data);
+                const updatedTransaction = await this.dataService.updateTransaction(data.id, data);
+                const index = this.transactions.findIndex(t => t.id === data.id);
+                if (index !== -1) {
+                    this.transactions[index] = updatedTransaction;
+                }
+                this.uiManager.renderTransactionList(this.transactions);
                 this.uiManager.showNotification("Transaction updated.", "success");
-                await this.loadDataAndRender();
             }
 
             async deleteTransaction(id) {
                  await this.dataService.deleteTransaction(id);
+                 this.transactions = this.transactions.filter(t => t.id !== id);
+                 this.uiManager.renderTransactionList(this.transactions);
                  this.uiManager.showNotification("Transaction deleted.", "error");
-                 await this.loadDataAndRender();
             }
 
             importTransactions(file) {
+                // Defensive check to ensure the integration layer is ready
                 if (this.categoryIntegration && this.categoryIntegration.csvImporter) {
                     console.log("Transaction import process started via CategoryIntegration.");
-                    this.categoryIntegration.csvImporter.import(file, () => {
+                    // The importer will handle file reading, parsing, and calling back to add transactions
+                    this.categoryIntegration.csvImporter.import(file, (transactions) => {
+                        console.log('transactions from importer', transactions);
                         this.loadDataAndRender();
+                        this.uiManager.showNotification(`${transactions.length} transactions imported successfully.`, "success");
                     });
                 } else {
                     console.error('CategoryIntegration or its CSV importer is not properly initialized.');
@@ -276,88 +231,49 @@
 
             exportTransactions() {
                 if (this.transactions && this.transactions.length > 0) {
-                    const csv = this.convertToCSV(this.transactions);
-                    const blob = new Blob([csv], { type: 'text/csv' });
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                    
+                    DataExporter.exportToCSV(this.transactions);
                     this.uiManager.showNotification('Transactions exported successfully.', 'success');
                 } else {
                     this.uiManager.showNotification('No transactions to export.', 'warning');
                 }
             }
 
-            convertToCSV(transactions) {
-                const headers = ['Date', 'Description', 'Amount', 'Account', 'Category', 'Subcategory', 'Entity'];
-                const rows = transactions.map(t => [
-                    t.date,
-                    t.description,
-                    t.amount,
-                    t.accountId,
-                    t.category || '',
-                    t.subcategory || '',
-                    t.entity || ''
-                ]);
-                
-                return [headers, ...rows].map(row => 
-                    row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')
-                ).join('\n');
-            }
-
             async runAiCategorization() {
-                const uncategorized = this.transactions.filter(t => 
-                    !t.category || t.category === 'Uncategorized'
-                );
+                const uncategorized = this.transactions.filter(t => t.category === 'Uncategorized');
 
                 if (uncategorized.length === 0) {
                     this.uiManager.showNotification('No transactions to categorize.', 'info');
                     return 0;
                 }
 
-                this.uiManager.showNotification(`Categorizing ${uncategorized.length} transactions...`, 'info');
+                const suggestions = await this.geminiService.batchCategorize(uncategorized);
+                let successCount = 0;
 
-                try {
-                    const suggestions = await this.geminiService.batchCategorize(uncategorized);
-                    let successCount = 0;
-
-                    for (const { transaction, suggestion } of suggestions) {
-                        if (suggestion && suggestion.category !== 'Uncategorized') {
-                            await this.dataService.updateTransaction(transaction.id, {
-                                category: suggestion.category,
-                                subcategory: suggestion.subcategory,
-                                entity: suggestion.entity
-                            });
-                            successCount++;
-                        }
+                for (const { transaction, suggestion } of suggestions) {
+                    if (suggestion && suggestion.category !== 'Uncategorized') {
+                        await this.dataService.updateTransaction(transaction.id, {
+                            category: suggestion.category,
+                            subcategory: suggestion.subcategory,
+                            entity: suggestion.entity
+                        });
+                        successCount++;
                     }
-
-                    this.uiManager.showNotification(`Categorized ${successCount} transactions.`, 'success');
-                    if (successCount > 0) {
-                        await this.loadDataAndRender();
-                    }
-                    
-                    return successCount;
-                } catch (error) {
-                    console.error('AI categorization error:', error);
-                    this.uiManager.showNotification('Failed to categorize transactions.', 'error');
-                    return 0;
                 }
+
+                return successCount;
             }
 
-            async fixTechBusinessTransactions() {
+            async recoverTechBusinessData() {
                 const transactions = await this.dataService.loadTransactions(1000);
                 let fixed = 0;
 
                 for (const t of transactions) {
+                    // Find all potential Tech Business transactions
+                    const desc = t.description?.toLowerCase() || '';
                     const isTechBusiness = (
-                        (t.amount > 10000 && t.accountId === '7991') ||
-                        (t.description?.toLowerCase().includes('packer') && t.amount > 0)
+                        (t.amount > 10000 && (desc.includes('packer') || desc.includes('thomas'))) ||
+                        (t.amount > 5000 && t.accountId === '7991') ||
+                        (desc.includes('packerthomas') && t.amount > 0)
                     );
 
                     if (isTechBusiness && t.entity !== 'Tech Business') {
@@ -368,23 +284,30 @@
                             accountId: '7991'
                         });
                         fixed++;
+                        console.log(`Fixed: ${t.description} - $${t.amount}`);
                     }
                 }
 
-                console.log(`Fixed ${fixed} Tech Business transactions`);
                 if (fixed > 0) {
-                    this.uiManager.showNotification(`Fixed ${fixed} Tech Business transactions. Reloading...`, 'success');
-                    setTimeout(() => location.reload(), 1500);
+                    this.uiManager.showNotification(`Recovered ${fixed} Tech Business transactions`, 'success');
+                    await this.loadDataAndRender();
                 }
                 return fixed;
             }
         }
 
         async function main() {
+            // This is the main entry point for the application.
+            // It follows a structured initialization process to prevent race conditions.
+
+            // Step 1: Initialize Firebase. This is the foundational service.
             const firebaseApp = initializeApp(AppConfig.FIREBASE_CONFIG);
             const auth = getAuth(firebaseApp);
             const firestore = getFirestore(firebaseApp);
 
+            // Step 2: Instantiate core services. These services are the building blocks
+            // of the application's functionality. They are created here so they can be
+            // injected as dependencies into other components that need them.
             const notificationManager = new NotificationManager();
             const authService = new AuthService(auth);
             const firestoreFunctions = {
@@ -395,39 +318,44 @@
             const geminiService = new GeminiService(AppConfig.GEMINI_API_KEY);
             await geminiService.initialize();
 
+            // Step 3: Create the main application controller shell.
             const app = new App();
-            window.app = app; 
-            app.dataService = dataService;
+            window.app = app; // Make app instance globally available
+            app.dataService = dataService; // Pass dataservice early for integrations
 
+            // Step 4: Instantiate and initialize the integration layer.
             const categoryIntegration = new CategoryIntegration(app);
             const integrationServices = await categoryIntegration.initialize();
             
+            // Step 5: Instantiate other managers that depend on the integration services.
             const settingsManager = new SettingsManager(geminiService, integrationServices.categoryManager);
             const uiManager = new UIManager({
                 ...integrationServices,
-                dataService,
                 settingsManager,
                 notificationManager,
                 authService
             });
 
+            // Step 6: Fully configure the app controller with all its dependencies.
             app.authService = authService;
             app.geminiService = geminiService;
             app.uiManager = uiManager;
             app.settingsManager = settingsManager;
-            app.categoryIntegration = integrationServices; 
+            app.categoryIntegration = integrationServices; // Add the integration services to the app
 
-            await app.init();
+            // Step 7: Initialize the app's main logic (auth listener, data loading).
+            app.init();
+
+            document.body.insertAdjacentHTML('beforeend', QuickActions.render());
 
             console.log("Finance Tracker Initialized");
             
+            // Initialize new QuickDebug class
             window.debugUtils = new QuickDebug(app);
-            
-            window.fixTechBusiness = () => app.fixTechBusinessTransactions();
-            window.runAI = () => app.runAiCategorization();
-            window.exportData = () => app.exportTransactions();
+            window.recoverTech = () => app.recoverTechBusinessData();
         }
 
+        // Run the app
         main().catch(console.error);
 
         // Keyboard shortcuts

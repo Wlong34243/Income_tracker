@@ -20,11 +20,6 @@ export class CategoryAwareCSVImporter {
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const text = e.target.result;
-                
-                // First, try to detect account from filename
-                if (!accountId) {
-                    accountId = this.extractAccountFromFilename(file.name);
-                }
 
                 Papa.parse(text, {
                     header: true,
@@ -38,30 +33,28 @@ export class CategoryAwareCSVImporter {
 
                         const headers = results.meta.fields;
                         const format = this.detectFormat(headers);
-                        
-                        // CRITICAL FIX: Validate and correct account assignment
-                        let transactions = this.processTransactions(
+
+                        let transactions = this.processRawTransactions(
                             results.data,
                             format,
                             accountId,
                             file.name
                         );
 
-                        // Auto-detect correct account based on transaction patterns
-                        const correctedTransactions = this.correctAccountAssignment(transactions);
-                        
-                        const duplicates = await this.findDuplicates(correctedTransactions);
+                        // Process transactions through categorization and correction
+                        transactions = await this.processTransactions(transactions, file.name);
+
+                        // Check for duplicates
+                        const duplicates = await this.findDuplicates(transactions);
                         if (duplicates.length > 0) {
                             console.log(`Found ${duplicates.length} duplicate transactions, skipping...`);
-                            transactions = correctedTransactions.filter(t => 
+                            transactions = transactions.filter(t => 
                                 !duplicates.some(d => 
                                     d.description === t.description && 
                                     d.date === t.date && 
                                     d.amount === t.amount
                                 )
                             );
-                        } else {
-                            transactions = correctedTransactions;
                         }
 
                         resolve(transactions);
@@ -75,7 +68,85 @@ export class CategoryAwareCSVImporter {
         });
     }
 
-    // Fix the correctAccountAssignment method (around line 135)
+    async findDuplicates(transactions) {
+        const existing = await this.dataService.loadTransactions(500);
+        const duplicates = [];
+
+        for (const newTx of transactions) {
+            const isDuplicate = existing.some(existingTx =>
+                existingTx.date === newTx.date &&
+                Math.abs(existingTx.amount - newTx.amount) < 0.01 &&
+                existingTx.description === newTx.description &&
+                existingTx.accountId === newTx.accountId
+            );
+
+            if (isDuplicate) {
+                duplicates.push(newTx);
+            }
+        }
+
+        return duplicates;
+    }
+
+    detectFormat(headers) {
+        // Check for Chase checking format
+        if (headers.includes('Posting Date') && headers.includes('Details')) {
+            return 'CHASE_CHECKING';
+        }
+        // Check for Chase credit card format
+        if (headers.includes('Transaction Date') && headers.includes('Category')) {
+            return 'CHASE_CREDIT';
+        }
+        // Default
+        return 'UNKNOWN';
+    }
+
+    processRawTransactions(data, format, accountId, filename) {
+        const transactions = [];
+        
+        for (const row of data) {
+            if (!row || Object.keys(row).length === 0) continue;
+            
+            let transaction = null;
+            
+            if (format === 'CHASE_CHECKING') {
+                transaction = {
+                    date: this.normalizeDate(row['Posting Date']),
+                    description: row['Details'] || row['Description'] || '',
+                    amount: parseFloat(row['Amount']) || 0,
+                    accountId: accountId,
+                    type: parseFloat(row['Amount']) > 0 ? 'Income' : 'Expense',
+                    balance: parseFloat(row['Balance']) || null
+                };
+            } else if (format === 'CHASE_CREDIT') {
+                transaction = {
+                    date: this.normalizeDate(row['Transaction Date'] || row['Post Date']),
+                    description: row['Description'] || '',
+                    amount: -Math.abs(parseFloat(row['Amount']) || 0), // Credit card amounts are negative
+                    accountId: accountId,
+                    type: 'Expense',
+                    originalCategory: row['Category'] || null
+                };
+            } else {
+                // Generic format - try common field names
+                transaction = {
+                    date: this.normalizeDate(row['Date'] || row['Transaction Date'] || row['Posting Date']),
+                    description: row['Description'] || row['Details'] || row['Memo'] || '',
+                    amount: parseFloat(row['Amount']) || 0,
+                    accountId: accountId,
+                    type: parseFloat(row['Amount']) > 0 ? 'Income' : 'Expense'
+                };
+            }
+            
+            if (transaction && transaction.date && transaction.description && !isNaN(transaction.amount)) {
+                transactions.push(transaction);
+            }
+        }
+        
+        console.log(`Parsed ${transactions.length} transactions from ${filename}`);
+        return transactions;
+    }
+
     correctAccountAssignment(transaction) {
         // Add null safety check
         if (!transaction || !transaction.description) {
@@ -100,7 +171,6 @@ export class CategoryAwareCSVImporter {
         return transaction;
     }
 
-    // Complete the processTransactions method to include error logging
     async processTransactions(transactions, filename) {
         const validTransactions = [];
         const errors = [];
@@ -108,7 +178,7 @@ export class CategoryAwareCSVImporter {
         for (const transaction of transactions) {
             try {
                 // Validate required fields
-                if (!transaction.date || !transaction.amount || !transaction.description) {
+                if (!transaction.date || transaction.amount === undefined || !transaction.description) {
                     errors.push({
                         transaction,
                         error: 'Missing required fields',
@@ -117,11 +187,7 @@ export class CategoryAwareCSVImporter {
                     continue;
                 }
 
-                // Normalize date format
-                transaction.date = this.normalizeDate(transaction.date);
-                
                 // Ensure amount is numeric
-                transaction.amount = parseFloat(transaction.amount);
                 if (isNaN(transaction.amount)) {
                     errors.push({
                         transaction,
@@ -131,7 +197,7 @@ export class CategoryAwareCSVImporter {
                     continue;
                 }
                 
-                // Apply account correction
+                // Apply account correction (fixes Tech Business assignments)
                 transaction = this.correctAccountAssignment(transaction);
                 
                 // Apply categorization
@@ -151,21 +217,20 @@ export class CategoryAwareCSVImporter {
             }
         }
         
-        // Log errors to Firestore
-        if (errors.length > 0 && this.dataService) {
-            for (const error of errors) {
-                await this.dataService.saveImportError(error);
-            }
-            console.warn(`Import had ${errors.length} errors from ${filename}`);
+        // Log errors if any
+        if (errors.length > 0) {
+            console.warn(`Import had ${errors.length} errors from ${filename}:`, errors);
         }
         
         console.log(`✅ Processed ${validTransactions.length} valid transactions from ${filename}`);
         return validTransactions;
     }
 
-    // Add date normalization helper
     normalizeDate(dateStr) {
         if (!dateStr) return null;
+
+        // Trim whitespace
+        dateStr = dateStr.trim();
 
         // Already in YYYY-MM-DD format
         if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
@@ -178,12 +243,20 @@ export class CategoryAwareCSVImporter {
             return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
         }
 
+        // Convert MM/DD/YY to YYYY-MM-DD
+        if (/^\d{1,2}\/\d{1,2}\/\d{2}$/.test(dateStr)) {
+            const [month, day, shortYear] = dateStr.split('/');
+            const year = '20' + shortYear;
+            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+
         // Try to parse other formats
         const parsed = new Date(dateStr);
         if (!isNaN(parsed)) {
             return parsed.toISOString().split('T')[0];
         }
 
-        throw new Error(`Unable to parse date: ${dateStr}`);
+        console.error(`Unable to parse date: ${dateStr}`);
+        return null;
     }
 }

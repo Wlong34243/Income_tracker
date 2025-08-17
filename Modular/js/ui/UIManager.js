@@ -1,4 +1,3 @@
-// js/ui/UIManager.js
 import { sanitizeHTML } from '../utils/Sanitizer.js';
 
 export class UIManager {
@@ -37,16 +36,16 @@ export class UIManager {
             this.rentTracker = new RentTracker(this.services.dataService, this.services.categoryManager);
         } catch (error) {
             console.error('Critical Error: Dashboard components failed to load.', error);
-            // We can decide to show an error to the user here
         }
     }
 
     async init(appController) {
         this.app = appController;
         
-        // Await the loading of critical UI components
+        // Load dashboard components
         await this.loadDashboardComponents();
 
+        // Let sub-components render their containers
         if (this.services.enhancedTransactionUI) {
             this.services.enhancedTransactionUI.renderAddModal(this.elements.modalContainer);
             this.services.enhancedTransactionUI.renderEditPanel(this.elements.editorContainer);
@@ -55,6 +54,7 @@ export class UIManager {
         this.renderCsvImportModal();
         this.renderSettingsModal();
 
+        // Pass this UI manager to services that need to call back to it
         if (this.services.csvImporter && typeof this.services.csvImporter.setUIManager === 'function') {
             this.services.csvImporter.setUIManager(this);
         }
@@ -84,7 +84,7 @@ export class UIManager {
             });
         }
 
-        // Add Search button (single implementation)
+        // Add Search button
         if (this.elements.headerButtons && !document.getElementById('searchBtn')) {
             const searchBtn = document.createElement('button');
             searchBtn.id = 'searchBtn';
@@ -95,7 +95,6 @@ export class UIManager {
                 this.showSearchInterface();
             });
 
-            // Insert after Import button
             const importBtnRef = this.elements.headerButtons.querySelector('#importTransactionsBtn');
             if (importBtnRef && importBtnRef.nextSibling) {
                 this.elements.headerButtons.insertBefore(searchBtn, importBtnRef.nextSibling);
@@ -190,6 +189,15 @@ export class UIManager {
                     if (transaction && this.services.enhancedTransactionUI) {
                         this.services.enhancedTransactionUI.openEditPanel(transaction);
                     }
+                }
+
+                const quickAddBtn = e.target.closest('.quick-add-recurring');
+                if (quickAddBtn && this.recurringTemplates) {
+                    const templateId = quickAddBtn.dataset.id;
+                    this.recurringTemplates.quickAddTransaction(templateId).then(() => {
+                        this.app.loadDataAndRender();
+                        this.showNotification('Recurring transaction added.', 'success');
+                    });
                 }
             });
 
