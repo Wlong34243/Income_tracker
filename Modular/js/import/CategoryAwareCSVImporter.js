@@ -174,22 +174,28 @@ export class CategoryAwareCSVImporter {
     parseValidDate(dateStr) {
         if (!dateStr) return null;
 
-        // Handle MM/DD/YYYY or M/D/YYYY format
         if (dateStr.includes('/')) {
             const parts = dateStr.split('/');
             if (parts.length === 3) {
-                const [month, day, year] = parts;
-                const fullYear = year.length === 2 ? '20' + year : year;
-                return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                let [month, day, year] = parts;
+                year = year.length === 2 ? '20' + year : year;
+
+                // Check if parts are valid numbers
+                if (isNaN(month) || isNaN(day) || isNaN(year)) {
+                    return null;
+                }
+
+                const date = new Date(year, month - 1, day);
+
+                // Check if the date is valid (e.g., no month 13, no day 32)
+                // and that the components match what we parsed
+                if (date.getFullYear() == year && date.getMonth() == (month - 1) && date.getDate() == day) {
+                    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                }
             }
         }
 
-        // Handle YYYY-MM-DD format
-        if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-            return dateStr;
-        }
-
-        console.warn('Unable to parse date:', dateStr);
+        // console.warn('Unable to parse date:', dateStr);
         return null;
     }
 

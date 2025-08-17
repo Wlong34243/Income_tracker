@@ -1,10 +1,13 @@
 {
   "name": "finance-tracker-modular",
   "version": "2.0.0",
+  "type": "module",
   "scripts": {
     "start": "http-server -p 8080",
     "build": "echo 'No build required for static site'",
-    "test": "jest"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage"
   },
   "devDependencies": {
     "http-server": "^14.1.1",

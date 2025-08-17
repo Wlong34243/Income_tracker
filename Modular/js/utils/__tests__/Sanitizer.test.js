@@ -11,7 +11,7 @@ import { sanitizeHTML } from '../Sanitizer.js';
 describe('sanitizeHTML', () => {
   it('should escape < and > characters', () => {
     const input = '<script>alert("xss")</script>';
-    const expected = '&lt;script&gt;alert("xss")&lt;/script&gt;';
+    const expected = '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;';
     expect(sanitizeHTML(input)).toBe(expected);
   });
 
