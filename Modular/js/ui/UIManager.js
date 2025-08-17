@@ -23,6 +23,7 @@ export class UIManager {
         this.monthlyDashboard = null;
         this.recurringTemplates = null;
         this.rentTracker = null;
+        this.transactionSearch = null;
     }
 
     async loadDashboardComponents() {
@@ -81,6 +82,26 @@ export class UIManager {
                     this.showNotification('Add transaction feature loading...', 'info');
                 }
             });
+        }
+
+        // Add Search button (single implementation)
+        if (this.elements.headerButtons && !document.getElementById('searchBtn')) {
+            const searchBtn = document.createElement('button');
+            searchBtn.id = 'searchBtn';
+            searchBtn.className = 'bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition flex items-center gap-2 text-sm';
+            searchBtn.innerHTML = '🔍 Search';
+
+            searchBtn.addEventListener('click', () => {
+                this.showSearchInterface();
+            });
+
+            // Insert after Import button
+            const importBtnRef = this.elements.headerButtons.querySelector('#importTransactionsBtn');
+            if (importBtnRef && importBtnRef.nextSibling) {
+                this.elements.headerButtons.insertBefore(searchBtn, importBtnRef.nextSibling);
+            } else {
+                this.elements.headerButtons.appendChild(searchBtn);
+            }
         }
 
         // Create and add export button
@@ -158,24 +179,6 @@ export class UIManager {
         const logoutBtn = this.elements.headerButtons?.querySelector('#logoutBtn');
         if (logoutBtn && this.services.authService) {
             logoutBtn.addEventListener('click', () => this.services.authService.signOut());
-        }
-
-        // Add Search button
-        if (this.elements.headerButtons && !document.getElementById('searchBtn')) {
-            const searchBtn = document.createElement('button');
-            searchBtn.id = 'searchBtn';
-            searchBtn.className = 'bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition flex items-center gap-2 text-sm';
-            searchBtn.innerHTML = '🔍 Search';
-
-            searchBtn.addEventListener('click', () => {
-                this.showSearchInterface();
-            });
-
-            // Insert after Import button
-            const importBtn = this.elements.headerButtons.querySelector('#importTransactionsBtn');
-            if (importBtn && importBtn.nextSibling) {
-                this.elements.headerButtons.insertBefore(searchBtn, importBtn.nextSibling);
-            }
         }
 
         // Transaction list event delegation
@@ -388,24 +391,19 @@ export class UIManager {
             const transactions = await this.services.csvImporter.parseCSV(file, accountId);
             this.showNotification(`Found ${transactions.length} transactions in ${filename}`, 'success');
 
-            // Process and save transactions
-            const processedTransactions = await this.services.csvImporter.processTransactions(transactions, filename);
-
-            if (processedTransactions.length > 0) {
-                await this.services.dataService.saveTransactionBatch(processedTransactions);
-
-                // Reload the dashboard
-                await this.app.loadDataAndRender();
-
-                // CLOSE THE MODAL - THIS WAS MISSING
-                if (this.elements.csvImportModal) {
-                    this.elements.csvImportModal.classList.add('hidden');
-                }
-
-                this.showNotification(`Successfully imported ${processedTransactions.length} transactions`, 'success');
+            if (this.services.categoryManager) {
+                const categorized = await this.services.categoryManager.categorizeAll(transactions);
+                await this.services.dataService.saveTransactionBatch(categorized);
+            } else {
+                await this.services.dataService.saveTransactionBatch(transactions);
             }
+
+            await this.app.loadDataAndRender();
+            
+            // CLOSE THE MODAL AFTER SUCCESSFUL IMPORT
+            this.elements.csvImportModal?.classList.add('hidden');
+            
         } catch (error) {
-            console.error('Import error:', error);
             this.showNotification(`Error processing ${filename}: ${error.message}`, 'error');
         }
     }
@@ -546,7 +544,7 @@ export class UIManager {
             await this.transactionSearch.init();
         }
 
-        // Hide dashboard
+        // Hide dashboard and transactions
         this.elements.dashboardContainer.style.display = 'none';
         this.elements.transactionsContainer.style.display = 'none';
 
@@ -555,16 +553,17 @@ export class UIManager {
         if (!searchContainer) {
             searchContainer = document.createElement('div');
             searchContainer.id = 'search-container';
-            this.elements.dashboardContainer.parentNode.appendChild(searchContainer);
+            this.elements.dashboardContainer.parentNode.insertBefore(searchContainer, this.elements.dashboardContainer.nextSibling);
         }
 
+        searchContainer.style.display = 'block';
         this.transactionSearch.render(searchContainer);
     }
 
     showDashboard() {
         const searchContainer = document.getElementById('search-container');
         if (searchContainer) {
-            searchContainer.innerHTML = '';
+            searchContainer.style.display = 'none';
         }
         this.elements.dashboardContainer.style.display = 'block';
         this.elements.transactionsContainer.style.display = 'block';
