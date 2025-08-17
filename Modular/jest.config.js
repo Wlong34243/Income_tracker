@@ -1,9 +1,16 @@
-/** @type {import('jest').Config} */
-const config = {
-  testEnvironment: 'jest-environment-jsdom',
-  // An empty transform is needed to prevent Jest from trying to use a
-  // default transformer that doesn't support ES Modules.
+export default {
+  testEnvironment: 'jsdom',
   transform: {},
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1'
+  },
+  testMatch: [
+    '**/tests/**/*.test.js',
+    '**/__tests__/**/*.js'
+  ],
+  collectCoverageFrom: [
+    'js/**/*.js',
+    '!js/dev/**',
+    '!js/**/*.test.js'
+  ]
 };
-
-export default config;
