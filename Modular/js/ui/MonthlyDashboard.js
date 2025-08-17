@@ -23,17 +23,15 @@ export class MonthlyDashboard {
         // Group by month for analysis
         const monthlyData = this.groupTransactionsByMonth(transactions);
 
-        // For the main display, show aggregate of all available months
-        // or last 4 months if you prefer
-        const fourMonthsAgo = new Date(2025, 3, 1); // April 2025
-        const endDate = new Date(2025, 7, 31); // July 2025
+        // In render method, replace date calculation with:
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 4); // Show last 4 months
 
         const relevantTransactions = transactions.filter(t => {
             const txDate = new Date(t.date);
-            return txDate >= fourMonthsAgo && txDate <= endDate;
+            return txDate >= startDate && txDate <= endDate;
         });
-
-        console.log(`Showing ${relevantTransactions.length} transactions from April-July 2025`);
 
         const realEstate = relevantTransactions.filter(t => t.entity === 'Real Estate' && t.category !== 'Transfer');
         const techBusiness = relevantTransactions.filter(t => t.entity === 'Tech Business' && t.category !== 'Transfer');
