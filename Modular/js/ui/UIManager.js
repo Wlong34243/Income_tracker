@@ -84,21 +84,23 @@ export class UIManager {
             });
         }
 
-        // Add Search & Edit tab button
-        if (this.elements.headerButtons && !document.getElementById('searchTransactionsBtn')) {
+        // Add Search button (single implementation)
+        if (this.elements.headerButtons && !document.getElementById('searchBtn')) {
             const searchBtn = document.createElement('button');
-            searchBtn.id = 'searchTransactionsBtn';
+            searchBtn.id = 'searchBtn';
             searchBtn.className = 'bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition flex items-center gap-2 text-sm';
-            searchBtn.innerHTML = '🔍 Search & Edit';
+            searchBtn.innerHTML = '🔍 Search';
 
             searchBtn.addEventListener('click', () => {
                 this.showSearchInterface();
             });
 
             // Insert after Import button
-            const importBtn = this.elements.headerButtons.querySelector('#importTransactionsBtn');
-            if (importBtn && importBtn.nextSibling) {
-                this.elements.headerButtons.insertBefore(searchBtn, importBtn.nextSibling);
+            const importBtnRef = this.elements.headerButtons.querySelector('#importTransactionsBtn');
+            if (importBtnRef && importBtnRef.nextSibling) {
+                this.elements.headerButtons.insertBefore(searchBtn, importBtnRef.nextSibling);
+            } else {
+                this.elements.headerButtons.appendChild(searchBtn);
             }
         }
 
@@ -397,6 +399,10 @@ export class UIManager {
             }
 
             await this.app.loadDataAndRender();
+            
+            // CLOSE THE MODAL AFTER SUCCESSFUL IMPORT
+            this.elements.csvImportModal?.classList.add('hidden');
+            
         } catch (error) {
             this.showNotification(`Error processing ${filename}: ${error.message}`, 'error');
         }
@@ -535,18 +541,19 @@ export class UIManager {
         if (!this.transactionSearch) {
             const { TransactionSearch } = await import('./TransactionSearch.js');
             this.transactionSearch = new TransactionSearch(this.services.dataService, this.services.categoryManager);
+            await this.transactionSearch.init();
         }
 
-        // Hide dashboard and show search
+        // Hide dashboard and transactions
         this.elements.dashboardContainer.style.display = 'none';
-        this.elements.transactionsContainer.innerHTML = '';
+        this.elements.transactionsContainer.style.display = 'none';
 
-        // Create search container if it doesn't exist
+        // Create or show search container
         let searchContainer = document.getElementById('search-container');
         if (!searchContainer) {
             searchContainer = document.createElement('div');
             searchContainer.id = 'search-container';
-            this.elements.dashboardContainer.parentNode.insertBefore(searchContainer, this.elements.dashboardContainer);
+            this.elements.dashboardContainer.parentNode.insertBefore(searchContainer, this.elements.dashboardContainer.nextSibling);
         }
 
         searchContainer.style.display = 'block';
@@ -559,6 +566,7 @@ export class UIManager {
             searchContainer.style.display = 'none';
         }
         this.elements.dashboardContainer.style.display = 'block';
+        this.elements.transactionsContainer.style.display = 'block';
         this.app.loadDataAndRender();
     }
 }
