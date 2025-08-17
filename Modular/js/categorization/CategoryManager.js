@@ -96,19 +96,42 @@ export class CategoryManager {
             };
         }
 
-        // Special rule for Lisa's income
-        if (transaction.accountId === '0111' && transaction.amount === 1500) {
-           const desc = transaction.description.toLowerCase();
-           if (desc.includes('michael katzen') || desc.includes('deposit') && desc.includes('927579')) {
-               return {
-                   category: 'Personal Income',
-                   subcategory: "Lisa's Monthly Income",
-                   entity: 'Personal',
-                   property: null,  // Not tied to any property
-                   confidence: 0.95,
-                   method: 'lisa_income_rule'
-               };
-           }
+        // PRIORITY 1: Lisa's Income Detection
+        // Transfers from 0111 to Lisa's accounts (0898 or 0005)
+        if (transaction.accountId === '0111' || descLower.includes('from chk ...0111')) {
+            // Check if it's going to Lisa's accounts
+            if (descLower.includes('to chk ...0898') ||
+                descLower.includes('to chk ...0005') ||
+                descLower.includes('transfer to chk ...0898') ||
+                descLower.includes('transfer to chk ...0005')) {
+
+                console.log('Detected Lisa\'s income transfer:', transaction.description);
+                return {
+                    category: 'Personal Income',
+                    subcategory: 'Lisa\'s Income',
+                    entity: 'Personal',
+                    property: null,
+                    confidence: 0.99,
+                    method: 'lisa_transfer_rule'
+                };
+            }
+        }
+
+        // Also check the reverse - money coming INTO 0898 or 0005 from 0111
+        if ((transaction.accountId === '0898' || transaction.accountId === '0005') &&
+            transaction.amount > 0) {
+            if (descLower.includes('from chk ...0111') ||
+                descLower.includes('transfer from chk ...0111')) {
+
+                return {
+                    category: 'Personal Income',
+                    subcategory: 'Lisa\'s Income',
+                    entity: 'Personal',
+                    property: null,
+                    confidence: 0.99,
+                    method: 'lisa_account_rule'
+                };
+            }
         }
 
         // 1. ACCOUNT-SPECIFIC RULES (HIGHEST PRIORITY)

@@ -92,23 +92,6 @@ export class DataService {
         }
     }
 
-    async saveImportError(errorData) {
-        const userId = this._getUserId();
-        if (AppConfig.DEMO_MODE) return; // Or handle demo mode appropriately
-
-        try {
-            const { collection, addDoc, serverTimestamp } = this.firestore;
-            await addDoc(collection(this.db, "import_errors"), {
-                ...errorData,
-                userId,
-                createdAt: serverTimestamp()
-            });
-        } catch (error) {
-            console.error("DataService: Error saving import error:", error);
-            // We probably don't want to throw here and stop the whole import
-        }
-    }
-
     // --- Firebase Operations ---
     async loadAccountsFromFirestore(userId) {
         try {
