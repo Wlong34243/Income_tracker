@@ -17,6 +17,12 @@ export class AppConfig {
     
     // Your specific account mapping
     static ACCOUNT_MAPPING = {
+        '0005': {
+            name: "Lisa's Checking (0005)",
+            type: 'Checking',
+            entity: 'Personal',
+            description: "Lisa's personal checking account"
+        },
         '0111': { 
             name: 'Sweep Account (0111)', 
             type: 'Checking', 

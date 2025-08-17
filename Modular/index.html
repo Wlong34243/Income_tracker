@@ -42,7 +42,6 @@
         </header>
         <main class="p-6">
             <div id="dashboard-container"></div>
-            <div id="search-container"></div>
             <div id="transactions-container" class="mt-6"></div>
         </main>
     </div>
@@ -358,22 +357,6 @@
         // Run the app
         main().catch(console.error);
 
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            // Ctrl/Cmd + F for search
-            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-                e.preventDefault();
-                document.getElementById('searchTransactionsBtn')?.click();
-            }
-
-            // Escape to return to dashboard
-            if (e.key === 'Escape') {
-                const searchContainer = document.getElementById('search-container');
-                if (searchContainer && searchContainer.style.display !== 'none') {
-                    app.uiManager.showDashboard();
-                }
-            }
-        });
     </script>
 </body>
 </html>

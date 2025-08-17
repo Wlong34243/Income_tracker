@@ -1,36 +1,15 @@
 {
   "name": "finance-tracker-modular",
-  "version": "1.0.0",
-  "description": "Modular Personal Finance Tracker with Real Estate and Tech Business Analytics",
-  "main": "index.html",
-  "type": "module",
+  "version": "2.0.0",
   "scripts": {
-    "start": "npx http-server . -p 8080 -o",
-    "dev": "npx live-server . --port=8080",
-    "build": "echo 'No build step required'",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
-  },
-  "dependencies": {
-    "@google/generative-ai": "^0.24.1",
-    "@tailwindcss/cli": "^4.1.11",
-    "firebase": "^9.22.0",
-    "papaparse": "^5.4.1",
-    "tailwindcss": "^4.1.11"
+    "start": "http-server -p 8080",
+    "build": "echo 'No build required for static site'",
+    "test": "jest"
   },
   "devDependencies": {
     "http-server": "^14.1.1",
-    "jest": "^30.0.5",
-    "jest-environment-jsdom": "^30.0.5",
-    "live-server": "^1.2.2"
-  },
-  "keywords": [
-    "finance",
-    "tracker",
-    "modular",
-    "real-estate",
-    "business",
-    "analytics"
-  ],
-  "author": "Finance Tracker User",
-  "license": "MIT"
+    "jest": "^29.5.0",
+    "@babel/preset-env": "^7.22.5",
+    "jest-environment-jsdom": "^29.5.0"
+  }
 }

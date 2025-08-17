@@ -3,6 +3,7 @@ export class MonthlyDashboard {
         this.dataService = dataService;
         this.categoryManager = categoryManager;
         this.targetMonthlyNet = 17932; // User's retirement income target
+        this.selectedPeriod = 'last4months';
     }
 
     async render(container) {
@@ -11,58 +12,66 @@ export class MonthlyDashboard {
         this.attachEventListeners(container);
     }
 
-    async calculateMetrics() {
-        // Load MORE transactions to ensure we get historical data
+    async calculateMonthlyMetrics() {
+        // Load more transactions to ensure we get all historical data
         const transactions = await this.dataService.loadTransactions(1000);
 
-        // Show last 4 months of data instead of just current month
-        const now = new Date();
-        const fourMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+        // REMOVE the current month filter - show ALL available data
+        // Don't filter by date at all initially
+        console.log(`Total transactions loaded: ${transactions.length}`);
 
-        // Filter to last 4 months
-        const recentTransactions = transactions.filter(t => {
+        // Group by month for analysis
+        const monthlyData = this.groupTransactionsByMonth(transactions);
+
+        // For the main display, show aggregate of all available months
+        // or last 4 months if you prefer
+        const fourMonthsAgo = new Date(2025, 3, 1); // April 2025
+        const endDate = new Date(2025, 7, 31); // July 2025
+
+        const relevantTransactions = transactions.filter(t => {
             const txDate = new Date(t.date);
-            return txDate >= fourMonthsAgo;
+            return txDate >= fourMonthsAgo && txDate <= endDate;
         });
 
-        console.log(`Dashboard showing ${recentTransactions.length} transactions from last 4 months`);
+        console.log(`Showing ${relevantTransactions.length} transactions from April-July 2025`);
 
-        // Calculate monthly average for target comparison
-        const monthlyTransactions = this.groupByMonth(recentTransactions);
-        const currentMonthData = monthlyTransactions[now.getMonth()] || [];
+        const realEstate = relevantTransactions.filter(t => t.entity === 'Real Estate' && t.category !== 'Transfer');
+        const techBusiness = relevantTransactions.filter(t => t.entity === 'Tech Business' && t.category !== 'Transfer');
+        const personal = relevantTransactions.filter(t => t.entity === 'Personal' && t.category !== 'Transfer');
 
-        // Separate by entity (excluding transfers)
-        const realEstate = currentMonthData.filter(t =>
-            t.entity === 'Real Estate' && t.category !== 'Transfer'
-        );
-        const techBusiness = currentMonthData.filter(t =>
-            t.entity === 'Tech Business' && t.category !== 'Transfer'
-        );
-
+        const realEstateMetrics = this.calculateEntityMetrics(realEstate);
         const techBusinessMetrics = this.calculateEntityMetrics(techBusiness);
 
-        // ... rest of calculation ...
+        const propertyData = this.calculatePropertyPerformance(realEstate);
 
-        // Fix the target to be the actual Tech Business transfers to Schwab
-        const techToSchwab = currentMonthData.filter(t =>
-            t.accountId === '7991' &&
-            t.description?.toLowerCase().includes('transfer') &&
-            t.description?.toLowerCase().includes('119')
-        ).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+        const targetProgress = {
+            current: realEstateMetrics.net + techBusinessMetrics.net,
+            target: 17932, // User's monthly retirement income goal
+            percentage: ((realEstateMetrics.net + techBusinessMetrics.net) / 17932 * 100)
+        };
+
+        const monthlyComparison = this.generateMonthlyComparison(transactions);
 
         return {
-            realEstate: this.calculateEntityMetrics(realEstate),
+            realEstate: realEstateMetrics,
             techBusiness: techBusinessMetrics,
-            personal: this.calculateEntityMetrics(currentMonthData.filter(t => t.entity === 'Personal')),
+            personal: this.calculateEntityMetrics(personal),
             combined: this.calculateCombinedMetrics(realEstate, techBusiness),
-            rentStatus: { expected: this.getExpectedRents(), received: this.getReceivedRents(realEstate), missing: this.findMissingRents(this.getExpectedRents(), this.getReceivedRents(realEstate)) },
-            targetProgress: {
-                amount: techBusinessMetrics.income,  // Use actual Tech income
-                target: 13000,  // Expected monthly Tech income
-                percentage: (techBusinessMetrics.income / 13000 * 100)
-            },
-            recurringDue: []
+            propertyData: propertyData,
+            targetProgress: targetProgress,
+            monthlyComparison: monthlyComparison
         };
+    }
+
+    groupTransactionsByMonth(transactions) {
+        return transactions.reduce((acc, t) => {
+            const month = new Date(t.date).getMonth();
+            if (!acc[month]) {
+                acc[month] = [];
+            }
+            acc[month].push(t);
+            return acc;
+        }, {});
     }
 
     calculateEntityMetrics(transactions) {
@@ -85,71 +94,38 @@ export class MonthlyDashboard {
         };
     }
 
-    calculateTargetProgress(realEstateTrans, techBusinessTrans) {
-        const combinedNet = this.calculateCombinedMetrics(realEstateTrans, techBusinessTrans).net;
-        const percentage = (combinedNet / this.targetMonthlyNet) * 100;
-        return {
-            percentage: percentage
-        };
-    }
-
-    getExpectedRents() {
-        // Based on user's tenant list from documents
-        return [
-            { tenant: 'jack sevilla', property: '5th ST E', amount: 1500 },
-            { tenant: 'araceli ponce', property: '5th ST E', amount: 1500 },
-            { tenant: 'lucy cepeda', property: '2024 50th', amount: 1400 },
-            { tenant: 'jesus cruz', property: '2024 50th', amount: 1400 },
-            { tenant: 'angel de la cruz', property: 'Las Palmas', amount: 1250 },
-            { tenant: 'pablo joaquin', property: '37th Ave E', amount: 1350 },
-            { tenant: 'wendy cordova', property: '2nd St W', amount: 1450 },
-            { tenant: 'geron vile', property: '2nd St W', amount: 1450 },
-            { tenant: 'michelle ruth', property: '1112 36th St W', amount: 1600 },
-            { tenant: 'steven malloy', property: '1112 36th St W', amount: 1600 },
-            { tenant: 'claribel castillomero', property: '59th Ave E', amount: 1550 },
-            { tenant: 'belem amaro', property: '59th Ave E', amount: 1550 }
-        ];
-    }
-
-    getReceivedRents(realEstateTransactions) {
-        const rentTransactions = realEstateTransactions.filter(t => t.subcategory === 'Rent' && t.amount > 0);
-        const received = [];
-        const expectedRents = this.getExpectedRents();
-
-        for (const rent of rentTransactions) {
-            const expected = expectedRents.find(e => rent.description.toLowerCase().includes(e.tenant));
-            if(expected) {
-                received.push({ ...expected, receivedAmount: rent.amount });
-            }
-        }
-        return received;
-    }
-
-    findMissingRents(expectedRents, receivedRents) {
-        return expectedRents.filter(expected => !receivedRents.some(received => received.tenant === expected.tenant));
-    }
-
-    getUpcomingRecurring() {
-        // This will be implemented once RecurringTemplates is available
-        return [];
-    }
-
-    formatCurrency(amount) {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-    }
-
     generateDashboardHTML(data) {
-        const { realEstate, techBusiness, combined, rentStatus, targetProgress, recurringDue } = data;
+        const { realEstate, techBusiness, combined, propertyData, targetProgress } = data;
 
         return `
             <div class="space-y-6">
+                <div class="bg-white p-4 rounded-lg shadow mb-6">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-semibold">Analysis Period</h3>
+                        <div class="flex gap-2">
+                            <select id="period-selector" class="px-3 py-1 border rounded">
+                                <option value="april2025">April 2025</option>
+                                <option value="may2025">May 2025</option>
+                                <option value="june2025">June 2025</option>
+                                <option value="july2025">July 2025</option>
+                                <option value="q2-2025">Q2 2025 (Apr-Jun)</option>
+                                <option value="last4months" selected>Last 4 Months</option>
+                                <option value="ytd">Year to Date</option>
+                            </select>
+                            <button id="refresh-dashboard" class="px-4 py-2 bg-blue-600 text-white rounded">
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Target Progress Bar -->
                 <div class="bg-white p-6 rounded-lg shadow">
                     <h3 class="text-lg font-semibold mb-3">Monthly Target Progress</h3>
                     <div class="mb-2">
                         <div class="flex justify-between text-sm mb-1">
                             <span>Net Income Progress</span>
-                            <span class="font-bold">${this.formatCurrency(combined.net)} / ${this.formatCurrency(this.targetMonthlyNet)}</span>
+                            <span class="font-bold">${this.formatCurrency(targetProgress.current)} / ${this.formatCurrency(targetProgress.target)}</span>
                         </div>
                         <div class="w-full bg-gray-200 rounded-full h-4">
                             <div class="bg-${targetProgress.percentage >= 100 ? 'green' : targetProgress.percentage >= 75 ? 'blue' : 'orange'}-600 h-4 rounded-full"
@@ -189,65 +165,160 @@ export class MonthlyDashboard {
                     </div>
                 </div>
 
-                <!-- Rent Collection Status -->
+                <!-- Property Performance Table -->
                 <div class="bg-white p-6 rounded-lg shadow">
-                    <h3 class="text-lg font-semibold mb-3">Rent Collection Status</h3>
-                    <div class="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <p class="text-sm text-gray-600">Expected This Month</p>
-                            <p class="text-xl font-bold">${this.formatCurrency(rentStatus.expected.reduce((sum, r) => sum + r.amount, 0))}</p>
-                        </div>
-                        <div>
-                            <p class="text-sm text-gray-600">Collected So Far</p>
-                            <p class="text-xl font-bold text-green-600">${this.formatCurrency(rentStatus.received.reduce((sum, r) => sum + r.amount, 0))}</p>
-                        </div>
-                    </div>
-                    ${rentStatus.missing.length > 0 ? `
-                        <div class="border-t pt-3">
-                            <p class="text-sm font-semibold text-red-600 mb-2">Missing Rents (${rentStatus.missing.length}):</p>
-                            <div class="space-y-1">
-                                ${rentStatus.missing.map(r => `
-                                    <div class="flex justify-between text-sm">
-                                        <span>${r.tenant} (${r.property})</span>
-                                        <span class="text-red-600 font-mono">${this.formatCurrency(r.amount)}</span>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    ` : '<p class="text-green-600 text-sm">✓ All rents collected!</p>'}
-                </div>
-
-                <!-- Upcoming Recurring Transactions -->
-                <div class="bg-white p-6 rounded-lg shadow">
-                    <h3 class="text-lg font-semibold mb-3">Upcoming Recurring Transactions</h3>
-                    <div class="space-y-2">
-                        ${recurringDue.length > 0 ? recurringDue.map(item => `
-                            <div class="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
-                                <div>
-                                    <p class="font-medium">${item.description}</p>
-                                    <p class="text-xs text-gray-500">Due: ${item.dueDate}</p>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="font-mono ${item.amount > 0 ? 'text-green-600' : 'text-red-600'}">${this.formatCurrency(item.amount)}</span>
-                                    <button class="quick-add-recurring text-blue-600 hover:text-blue-800"
-                                            data-description="${item.description}"
-                                            data-amount="${item.amount}"
-                                            data-account="${item.accountId}"
-                                            data-category="${item.category}">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                        `).join('') : '<p class="text-sm text-gray-500">No upcoming transactions in the next 7 days.</p>'}
-                    </div>
+                    <h3 class="text-lg font-semibold mb-3">Property Performance</h3>
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="p-2 text-left">Property</th>
+                                <th class="p-2 text-right">Expected</th>
+                                <th class="p-2 text-right">Received</th>
+                                <th class="p-2 text-right">Expenses</th>
+                                <th class="p-2 text-right">Net</th>
+                                <th class="p-2 text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${this.generatePropertyRows(propertyData)}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         `;
     }
 
+    calculatePropertyPerformance(realEstateTransactions) {
+        const properties = {
+            '5th ST E': { expected: 3000, received: 0, expenses: 0 },
+            '2024 50th': { expected: 2800, received: 0, expenses: 0 },
+            'Las Palmas': { expected: 1250, received: 0, expenses: 0 },
+            '37th Ave E': { expected: 1350, received: 0, expenses: 0 },
+            '2nd St W': { expected: 2900, received: 0, expenses: 0 },
+            '1112 36th St W': { expected: 3200, received: 0, expenses: 0 },
+            '59th Ave E': { expected: 3100, received: 0, expenses: 0 }
+        };
+
+        // Calculate received rent by property
+        realEstateTransactions.forEach(t => {
+            if (t.subcategory === 'Rent' && t.amount > 0) {
+                const property = this.identifyPropertyFromTransaction(t);
+                if (properties[property]) {
+                    properties[property].received += t.amount;
+                }
+            }
+            // Track property expenses if identifiable
+            if (t.amount < 0 && t.entity === 'Real Estate') {
+                const property = this.identifyPropertyFromTransaction(t);
+                if (properties[property]) {
+                    properties[property].expenses += Math.abs(t.amount);
+                }
+            }
+        });
+
+        // Calculate net for each property
+        Object.keys(properties).forEach(prop => {
+            const p = properties[prop];
+            p.net = p.received - p.expenses;
+            p.status = p.received === 0 ? '🔴 Missing' :
+                       p.received < p.expected ? '⚠️ Partial' : '✅ Collected';
+        });
+
+        return properties;
+    }
+
+    generatePropertyRows(propertyData) {
+        return Object.entries(propertyData).map(([name, data]) => `
+            <tr>
+                <td class="p-2">${name}</td>
+                <td class="p-2 text-right">${this.formatCurrency(data.expected)}</td>
+                <td class="p-2 text-right">${this.formatCurrency(data.received)}</td>
+                <td class="p-2 text-right">${this.formatCurrency(data.expenses)}</td>
+                <td class="p-2 text-right font-bold ${data.net >= 0 ? 'text-green-600' : 'text-red-600'}">${this.formatCurrency(data.net)}</td>
+                <td class="p-2 text-center">${data.status}</td>
+            </tr>
+        `).join('');
+    }
+
+    identifyPropertyFromTransaction(transaction) {
+        if (transaction.property) {
+            return transaction.property;
+        }
+        // Fallback for older transactions, can be improved
+        const desc = transaction.description.toLowerCase();
+        if(desc.includes('5th st')) return '5th ST E';
+        if(desc.includes('50th')) return '2024 50th';
+        return 'Unassigned';
+    }
+
     attachEventListeners(container) {
-        // This will be implemented later
+        // Period selector
+        const periodSelector = container.querySelector('#period-selector');
+        if (periodSelector) {
+            periodSelector.value = this.selectedPeriod;
+            periodSelector.addEventListener('change', async (e) => {
+                this.selectedPeriod = e.target.value;
+                await this.render(container);
+            });
+        }
+
+        // Refresh button
+        container.querySelector('#refresh-dashboard')?.addEventListener('click', async () => {
+            await this.render(container);
+        });
+    }
+
+    getDateRangeForPeriod(period) {
+        const now = new Date(2025, 7, 15); // Use a fixed "now" for consistent testing
+        switch(period) {
+            case 'april2025':
+                return { start: new Date(2025, 3, 1), end: new Date(2025, 3, 30) };
+            case 'may2025':
+                return { start: new Date(2025, 4, 1), end: new Date(2025, 4, 31) };
+            case 'june2025':
+                return { start: new Date(2025, 5, 1), end: new Date(2025, 5, 30) };
+            case 'july2025':
+                return { start: new Date(2025, 6, 1), end: new Date(2025, 6, 31) };
+            case 'q2-2025':
+                return { start: new Date(2025, 3, 1), end: new Date(2025, 5, 30) };
+            case 'last4months':
+                return { start: new Date(2025, 3, 1), end: new Date(2025, 6, 31) };
+            case 'ytd':
+                return { start: new Date(2025, 0, 1), end: new Date(2025, 6, 31) };
+            default:
+                return { start: new Date(2025, 3, 1), end: new Date(2025, 6, 31) };
+        }
+    }
+
+    generateMonthlyComparison(transactions) {
+        const months = ['April', 'May', 'June', 'July'];
+        const monthlyData = {};
+
+        months.forEach((month, index) => {
+            const monthNum = index + 3; // April = 3
+            const monthTrans = transactions.filter(t => {
+                const date = new Date(t.date);
+                return date.getMonth() === monthNum && date.getFullYear() === 2025;
+            });
+
+            monthlyData[month] = {
+                realEstateIncome: this.sumByCategory(monthTrans, 'Real Estate Income'),
+                realEstateExpenses: this.sumByCategory(monthTrans, 'Property Expenses'),
+                techIncome: this.sumByCategory(monthTrans, 'Tech Business Income'),
+                netIncome: 0 // Calculate this
+            };
+        });
+
+        return monthlyData;
+    }
+
+    sumByCategory(transactions, category) {
+        return transactions
+            .filter(t => t.category === category)
+            .reduce((sum, t) => sum + t.amount, 0);
+    }
+
+    formatCurrency(amount) {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
     }
 }
