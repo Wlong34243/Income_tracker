@@ -59,11 +59,7 @@ export class DataService {
         return this.saveAccountToFirestore(userId, account);
     }
 
-    async loadTransactions(limit = 100) {
-        if (!this.auth.currentUser) {
-            console.warn('No authenticated user, returning empty array');
-            return [];
-        }
+    async loadTransactions(limit = 1000) {
         const userId = this._getUserId();
         if (AppConfig.DEMO_MODE) return this.loadTransactionsFromLocalStorage(userId);
         return this.loadTransactionsFromFirestore(userId, limit);
@@ -122,37 +118,10 @@ export class DataService {
 
     async loadTransactionsFromFirestore(userId, limitCount) {
         try {
-            console.log('Loading transactions for user:', userId);
             const { collection, query, orderBy, limit, getDocs } = this.firestore;
-            
-            const q = query(
-                collection(this.db, "users", userId, "transactions"), 
-                orderBy('date', 'desc'), 
-                limit(limitCount)
-            );
-
+            const q = query(collection(this.db, "users", userId, "transactions"), orderBy('date', 'desc'), limit(limitCount));
             const snapshot = await getDocs(q);
-            
-            if (snapshot.empty) {
-                console.log('No transactions found in Firestore');
-                return [];
-            }
-            
-            const transactions = [];
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                transactions.push({
-                    id: doc.id,
-                    ...data,
-                    // Ensure date is valid and amount is a number
-                    date: data.date || null,
-                    amount: parseFloat(data.amount) || 0
-                });
-            });
-            
-            console.log(`Loaded ${transactions.length} transactions from Firestore`);
-            return transactions;
-            
+            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         } catch (error) {
             console.error("DataService: Error loading transactions:", error);
             throw new Error("Could not load transactions.");

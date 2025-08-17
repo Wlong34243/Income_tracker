@@ -20,11 +20,6 @@ export class CategoryAwareCSVImporter {
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const text = e.target.result;
-                
-                // First, try to detect account from filename
-                if (!accountId) {
-                    accountId = this.extractAccountFromFilename(file.name);
-                }
 
                 Papa.parse(text, {
                     header: true,
@@ -38,29 +33,17 @@ export class CategoryAwareCSVImporter {
 
                         const headers = results.meta.fields;
                         const format = this.detectFormat(headers);
-                        
-                        // CRITICAL FIX: Validate and correct account assignment
+
                         let transactions = this.processTransactions(
                             results.data,
                             format,
                             accountId
                         );
 
-                        // Auto-detect correct account based on transaction patterns
-                        const correctedTransactions = this.correctAccountAssignment(transactions);
-                        
-                        const duplicates = await this.findDuplicates(correctedTransactions);
+                        const duplicates = await this.findDuplicates(transactions);
                         if (duplicates.length > 0) {
                             console.log(`Found ${duplicates.length} duplicate transactions, skipping...`);
-                            transactions = correctedTransactions.filter(t => 
-                                !duplicates.some(d => 
-                                    d.description === t.description && 
-                                    d.date === t.date && 
-                                    d.amount === t.amount
-                                )
-                            );
-                        } else {
-                            transactions = correctedTransactions;
+                            transactions = transactions.filter(t => !duplicates.some(d => d.description === t.description && d.date === t.date && d.amount === t.amount));
                         }
 
                         resolve(transactions);
@@ -71,30 +54,6 @@ export class CategoryAwareCSVImporter {
                 });
             };
             reader.readAsText(file);
-        });
-    }
-
-    // Add this new method to correct account assignments
-    correctAccountAssignment(transactions) {
-        return transactions.map(t => {
-            const descLower = t.description.toLowerCase();
-            
-            // Rent payments MUST go to 0111
-            if (descLower.includes('zelle') && t.amount > 500) {
-                t.accountId = '0111';
-            }
-            
-            // Tech business income from PackerThomas MUST go to 7991
-            if (descLower.includes('packerthomas') || descLower.includes('packer thomas')) {
-                t.accountId = '7991';
-            }
-            
-            // Michael Katzen payment (Lisa's income) MUST go to 0111
-            if (descLower.includes('michael katzen') && Math.abs(t.amount - 1500) < 10) {
-                t.accountId = '0111';
-            }
-            
-            return t;
         });
     }
 
@@ -131,17 +90,26 @@ export class CategoryAwareCSVImporter {
         return 'UNKNOWN';
     }
 
-    correctAccountAssignment(t) {
-        const descLower = t.description.toLowerCase();
-        // Tech business income detection is FAILING
-        // Need to check for PackerThomas variations:
+    correctAccountAssignment(transaction) {
+        // Add safety check
+        if (!transaction || !transaction.description) {
+            return transaction;
+        }
+
+        const descLower = transaction.description.toLowerCase();
+
+        // Force Tech Business transactions to account 7991
         if (descLower.includes('packerthomas') ||
             descLower.includes('packer thomas') ||
-            descLower.includes('packer') ||
-            descLower.includes('audit')) {
-            t.accountId = '7991';  // FORCE to Tech Business account
+            descLower.includes('audit') ||
+            (transaction.amount > 10000 && descLower.includes('deposit'))) {
+            transaction.accountId = '7991';
+            transaction.entity = 'Tech Business';
+            transaction.category = 'Tech Business Income';
+            console.log('Corrected Tech Business transaction:', transaction.description);
         }
-        return t;
+
+        return transaction;
     }
 
     processTransactions(data, format, accountId) {
@@ -187,43 +155,19 @@ export class CategoryAwareCSVImporter {
 
     parseValidDate(dateStr) {
         if (!dateStr) return null;
-        
-        // Clean the date string
-        dateStr = dateStr.trim();
-        
-        // Handle MM/DD/YYYY format (most common in Chase CSVs)
+
+        // Handle MM/DD/YYYY format
         if (dateStr.includes('/')) {
-            const parts = dateStr.split('/');
-            if (parts.length === 3) {
-                const month = parts[0].padStart(2, '0');
-                const day = parts[1].padStart(2, '0');
-                let year = parts[2];
-                
-                // Handle 2-digit years
-                if (year.length === 2) {
-                    year = '20' + year;
-                }
-                
-                // Return ISO format: YYYY-MM-DD
-                const isoDate = `${year}-${month}-${day}`;
-                
-                // Validate the date
-                const testDate = new Date(isoDate);
-                if (!isNaN(testDate.getTime())) {
-                    return isoDate;
-                }
-            }
+            const [month, day, year] = dateStr.split('/');
+            const fullYear = year.length === 2 ? '20' + year : year;
+            return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
         }
-        
-        // Handle YYYY-MM-DD format (already correct)
+
+        // Already in correct format
         if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-            const testDate = new Date(dateStr);
-            if (!isNaN(testDate.getTime())) {
-                return dateStr;
-            }
+            return dateStr;
         }
-        
-        console.error('Could not parse date:', dateStr);
+
         return null;
     }
 
