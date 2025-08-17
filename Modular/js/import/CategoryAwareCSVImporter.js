@@ -91,22 +91,40 @@ export class CategoryAwareCSVImporter {
     }
 
     correctAccountAssignment(transaction) {
-        // Add safety check
         if (!transaction || !transaction.description) {
             return transaction;
         }
 
-        const descLower = transaction.description.toLowerCase();
+        const desc = transaction.description.toLowerCase();
 
-        // Force Tech Business transactions to account 7991
-        if (descLower.includes('packerthomas') ||
-            descLower.includes('packer thomas') ||
-            descLower.includes('audit') ||
-            (transaction.amount > 10000 && descLower.includes('deposit'))) {
+        // Tech Business rules
+        if (desc.includes('packerthomas') ||
+            desc.includes('packer thomas') ||
+            desc.includes('audit') ||
+            desc.includes('consulting')) {
             transaction.accountId = '7991';
             transaction.entity = 'Tech Business';
             transaction.category = 'Tech Business Income';
-            console.log('Corrected Tech Business transaction:', transaction.description);
+            transaction.subcategory = 'Consulting';
+            return transaction;
+        }
+
+        // Lisa's income rules
+        if ((desc.includes('to chk ...0898') || desc.includes('to chk ...0005')) &&
+            desc.includes('from chk ...0111')) {
+            transaction.category = 'Personal Income';
+            transaction.subcategory = "Lisa's Income";
+            transaction.entity = 'Personal';
+            return transaction;
+        }
+
+        // Michael Katzen settlement
+        if (desc.includes('michael katzen')) {
+            transaction.category = 'Personal Income';
+            transaction.subcategory = 'Legal Settlement';
+            transaction.entity = 'Personal';
+            transaction.accountId = '0898';
+            return transaction;
         }
 
         return transaction;
@@ -156,18 +174,22 @@ export class CategoryAwareCSVImporter {
     parseValidDate(dateStr) {
         if (!dateStr) return null;
 
-        // Handle MM/DD/YYYY format
+        // Handle MM/DD/YYYY or M/D/YYYY format
         if (dateStr.includes('/')) {
-            const [month, day, year] = dateStr.split('/');
-            const fullYear = year.length === 2 ? '20' + year : year;
-            return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            const parts = dateStr.split('/');
+            if (parts.length === 3) {
+                const [month, day, year] = parts;
+                const fullYear = year.length === 2 ? '20' + year : year;
+                return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            }
         }
 
-        // Already in correct format
+        // Handle YYYY-MM-DD format
         if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
             return dateStr;
         }
 
+        console.warn('Unable to parse date:', dateStr);
         return null;
     }
 
