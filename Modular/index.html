@@ -293,6 +293,39 @@
                 }
                 return fixed;
             }
+
+            async fixLisaIncomeTransactions() {
+                const transactions = await this.dataService.loadTransactions(1000);
+                let fixed = 0;
+
+                for (const t of transactions) {
+                    const desc = t.description?.toLowerCase() || '';
+
+                    // Find transfers from 0111 to Lisa's accounts
+                    if ((desc.includes('from chk ...0111') &&
+                         (desc.includes('to chk ...0898') || desc.includes('to chk ...0005'))) ||
+                        ((t.accountId === '0898' || t.accountId === '0005') &&
+                         desc.includes('from chk ...0111'))) {
+
+                        // Update to Lisa's Income
+                        if (t.category !== 'Personal Income' || t.subcategory !== "Lisa's Income") {
+                            await this.dataService.updateTransaction(t.id, {
+                                category: 'Personal Income',
+                                subcategory: "Lisa's Income",
+                                entity: 'Personal'
+                            });
+                            fixed++;
+                            console.log(`Fixed Lisa's income: ${t.description} - $${t.amount}`);
+                        }
+                    }
+                }
+
+                if (fixed > 0) {
+                    this.uiManager.showNotification(`Fixed ${fixed} Lisa income transactions`, 'success');
+                    await this.loadDataAndRender();
+                }
+                return fixed;
+            }
         }
 
         async function main() {
@@ -352,6 +385,7 @@
             // Initialize new QuickDebug class
             window.debugUtils = new QuickDebug(app);
             window.recoverTech = () => app.recoverTechBusinessData();
+            window.fixLisaIncome = () => app.fixLisaIncomeTransactions();
         }
 
         // Run the app
