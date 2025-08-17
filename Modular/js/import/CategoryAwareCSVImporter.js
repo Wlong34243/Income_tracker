@@ -20,11 +20,6 @@ export class CategoryAwareCSVImporter {
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const text = e.target.result;
-                
-                // First, try to detect account from filename
-                if (!accountId) {
-                    accountId = this.extractAccountFromFilename(file.name);
-                }
 
                 Papa.parse(text, {
                     header: true,
@@ -38,30 +33,17 @@ export class CategoryAwareCSVImporter {
 
                         const headers = results.meta.fields;
                         const format = this.detectFormat(headers);
-                        
-                        // CRITICAL FIX: Validate and correct account assignment
+
                         let transactions = this.processTransactions(
                             results.data,
                             format,
-                            accountId,
-                            file.name
+                            accountId
                         );
 
-                        // Auto-detect correct account based on transaction patterns
-                        const correctedTransactions = this.correctAccountAssignment(transactions);
-                        
-                        const duplicates = await this.findDuplicates(correctedTransactions);
+                        const duplicates = await this.findDuplicates(transactions);
                         if (duplicates.length > 0) {
                             console.log(`Found ${duplicates.length} duplicate transactions, skipping...`);
-                            transactions = correctedTransactions.filter(t => 
-                                !duplicates.some(d => 
-                                    d.description === t.description && 
-                                    d.date === t.date && 
-                                    d.amount === t.amount
-                                )
-                            );
-                        } else {
-                            transactions = correctedTransactions;
+                            transactions = transactions.filter(t => !duplicates.some(d => d.description === t.description && d.date === t.date && d.amount === t.amount));
                         }
 
                         resolve(transactions);
@@ -75,17 +57,48 @@ export class CategoryAwareCSVImporter {
         });
     }
 
-    // Fix the correctAccountAssignment method (around line 135)
+    async findDuplicates(transactions) {
+        const existing = await this.dataService.loadTransactions(500);
+        const duplicates = [];
+
+        for (const newTx of transactions) {
+            const isDuplicate = existing.some(existingTx =>
+                existingTx.date === newTx.date &&
+                Math.abs(existingTx.amount - newTx.amount) < 0.01 &&
+                existingTx.description === newTx.description &&
+                existingTx.accountId === newTx.accountId
+            );
+
+            if (isDuplicate) {
+                duplicates.push(newTx);
+            }
+        }
+
+        return duplicates;
+    }
+
+    detectFormat(headers) {
+        // Check for Chase checking format
+        if (headers.includes('Posting Date') && headers.includes('Details')) {
+            return 'CHASE_CHECKING';
+        }
+        // Check for Chase credit card format
+        if (headers.includes('Transaction Date') && headers.includes('Category')) {
+            return 'CHASE_CREDIT';
+        }
+        // Default
+        return 'UNKNOWN';
+    }
+
     correctAccountAssignment(transaction) {
-        // Add null safety check
+        // Add safety check
         if (!transaction || !transaction.description) {
-            console.warn('Transaction missing description:', transaction);
             return transaction;
         }
 
         const descLower = transaction.description.toLowerCase();
 
-        // Force Tech Business transactions to correct account
+        // Force Tech Business transactions to account 7991
         if (descLower.includes('packerthomas') ||
             descLower.includes('packer thomas') ||
             descLower.includes('audit') ||
@@ -93,97 +106,74 @@ export class CategoryAwareCSVImporter {
             transaction.accountId = '7991';
             transaction.entity = 'Tech Business';
             transaction.category = 'Tech Business Income';
-            transaction.subcategory = 'Consulting';
-            console.log('✅ Corrected Tech Business transaction:', transaction.description, transaction.amount);
+            console.log('Corrected Tech Business transaction:', transaction.description);
         }
 
         return transaction;
     }
 
-    // Complete the processTransactions method to include error logging
-    async processTransactions(transactions, filename) {
-        const validTransactions = [];
-        const errors = [];
-        
-        for (const transaction of transactions) {
-            try {
-                // Validate required fields
-                if (!transaction.date || !transaction.amount || !transaction.description) {
-                    errors.push({
-                        transaction,
-                        error: 'Missing required fields',
-                        filename
-                    });
-                    continue;
-                }
+    processTransactions(data, format, accountId) {
+        const transactions = [];
 
-                // Normalize date format
-                transaction.date = this.normalizeDate(transaction.date);
-                
-                // Ensure amount is numeric
-                transaction.amount = parseFloat(transaction.amount);
-                if (isNaN(transaction.amount)) {
-                    errors.push({
-                        transaction,
-                        error: 'Invalid amount',
-                        filename
-                    });
-                    continue;
-                }
-                
-                // Apply account correction
+        for (const row of data) {
+            // Skip empty rows
+            if (!row || Object.keys(row).length === 0) continue;
+
+            let transaction = null;
+
+            if (format === 'CHASE_CHECKING') {
+                transaction = {
+                    date: this.parseValidDate(row['Posting Date']),
+                    description: row['Description'] || '',
+                    amount: this.parseAmount(row['Amount']),
+                    type: row['Type'] || '',
+                    balance: this.parseAmount(row['Balance']),
+                    accountId: accountId
+                };
+            } else if (format === 'CHASE_CREDIT') {
+                // Handle both 7 and 8 column versions
+                const amount = this.parseAmount(row['Amount']);
+                transaction = {
+                    date: this.parseValidDate(row['Transaction Date'] || row['Post Date']),
+                    description: row['Description'] || '',
+                    amount: -Math.abs(amount), // Credit charges are negative
+                    category: row['Category'] || '',
+                    type: row['Type'] || '',
+                    accountId: accountId
+                };
+            }
+
+            // Only add valid transactions
+            if (transaction && transaction.date && transaction.amount !== 0) {
                 transaction = this.correctAccountAssignment(transaction);
-                
-                // Apply categorization
-                if (this.categoryManager) {
-                    const categorization = this.categoryManager.categorizeTransaction(transaction);
-                    Object.assign(transaction, categorization);
-                }
-
-                validTransactions.push(transaction);
-
-            } catch (error) {
-                errors.push({
-                    transaction,
-                    error: error.message,
-                    filename
-                });
+                transactions.push(transaction);
             }
         }
-        
-        // Log errors to Firestore
-        if (errors.length > 0 && this.dataService) {
-            for (const error of errors) {
-                await this.dataService.saveImportError(error);
-            }
-            console.warn(`Import had ${errors.length} errors from ${filename}`);
-        }
-        
-        console.log(`✅ Processed ${validTransactions.length} valid transactions from ${filename}`);
-        return validTransactions;
+
+        return transactions;
     }
 
-    // Add date normalization helper
-    normalizeDate(dateStr) {
+    parseValidDate(dateStr) {
         if (!dateStr) return null;
 
-        // Already in YYYY-MM-DD format
-        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        // Handle MM/DD/YYYY format
+        if (dateStr.includes('/')) {
+            const [month, day, year] = dateStr.split('/');
+            const fullYear = year.length === 2 ? '20' + year : year;
+            return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+
+        // Already in correct format
+        if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
             return dateStr;
         }
 
-        // Convert MM/DD/YYYY to YYYY-MM-DD
-        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
-            const [month, day, year] = dateStr.split('/');
-            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-        }
+        return null;
+    }
 
-        // Try to parse other formats
-        const parsed = new Date(dateStr);
-        if (!isNaN(parsed)) {
-            return parsed.toISOString().split('T')[0];
-        }
-
-        throw new Error(`Unable to parse date: ${dateStr}`);
+    parseAmount(amountStr) {
+        if (!amountStr) return 0;
+        // Remove $ and commas, convert to float
+        return parseFloat(amountStr.replace(/[$,]/g, '')) || 0;
     }
 }

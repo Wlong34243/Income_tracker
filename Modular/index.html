@@ -339,7 +339,7 @@
             const settingsManager = new SettingsManager(geminiService, integrationServices.categoryManager);
             const uiManager = new UIManager({
                 ...integrationServices,
-                dataService, // <-- CORRECT FIX APPLIED HERE
+                dataService,
                 settingsManager,
                 notificationManager,
                 authService
