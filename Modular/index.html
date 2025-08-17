@@ -21,8 +21,7 @@
 <body class="bg-gray-50 min-h-screen font-sans">
     
     <div id="authContainer">
-        <!-- Auth UI will be rendered here by AuthService -->
-    </div>
+        </div>
 
     <div id="mainApp" class="hidden">
         <header class="bg-white shadow-md">
@@ -46,7 +45,6 @@
         </main>
     </div>
 
-    <!-- Modals and Side Panels will be managed by their respective UI components -->
     <div id="modal-container"></div>
     <div id="editor-container"></div>
     <div id="notification-container" class="fixed bottom-5 right-5 z-50"></div>
@@ -101,7 +99,6 @@
             async checkDataIntegrity() {
                 const transactions = await this.app.dataService.loadTransactions(1000);
 
-                // Group by account
                 const byAccount = {};
                 transactions.forEach(t => {
                     if (!byAccount[t.accountId]) {
@@ -113,7 +110,6 @@
 
                 console.table(byAccount);
 
-                // Check Tech Business specifically
                 const techTransactions = transactions.filter(t =>
                     t.entity === 'Tech Business' ||
                     t.accountId === '7991' ||
@@ -135,7 +131,7 @@
                 this.settingsManager = null;
                 this.transactions = [];
                 this.accounts = [];
-                this.config = AppConfig; // Make config available to integrations
+                this.config = AppConfig;
             }
 
             init() {
@@ -145,8 +141,7 @@
                 this.authService.onAuthStateChanged(async (user) => {
                     if (user) {
                         this.uiManager.showMainApp(user);
-                        // Ensure default accounts exist
-                        await app.dataService.ensureDefaultAccounts();
+                        await this.dataService.ensureDefaultAccounts();
                         await this.loadDataAndRender();
                     } else {
                         this.uiManager.showAuth();
@@ -163,13 +158,11 @@
                     
                     console.log(`Loaded ${this.accounts.length} accounts and ${this.transactions.length} transactions.`);
                     
-                    // Match transfers after loading
                     const transferPairs = TransferMatcher.findTransferPairs(this.transactions);
                     if (transferPairs.length > 0) {
                         console.log(`Found ${transferPairs.length} transfer pairs.`);
                     }
 
-                    // Generate the business analytics report
                     const analytics = new BusinessAnalytics(this.transactions);
                     const report = analytics.generateReport();
 
@@ -183,7 +176,6 @@
             }
 
             async addTransaction(data) {
-                // FIX APPLIED: Changed addTransaction to saveTransaction
                 try {
                     const newTransaction = await this.dataService.saveTransaction(data);
                     this.transactions.unshift(newTransaction);
@@ -213,10 +205,8 @@
             }
 
             importTransactions(file) {
-                // Defensive check to ensure the integration layer is ready
-                if (this.categoryIntegration && this.categoryIntegration.csvImporter) {
+                if (this.categoryIntegration?.csvImporter) {
                     console.log("Transaction import process started via CategoryIntegration.");
-                    // The importer will handle file reading, parsing, and calling back to add transactions
                     this.categoryIntegration.csvImporter.import(file, (transactions) => {
                         console.log('transactions from importer', transactions);
                         this.loadDataAndRender();
@@ -229,7 +219,7 @@
             }
 
             exportTransactions() {
-                if (this.transactions && this.transactions.length > 0) {
+                if (this.transactions?.length > 0) {
                     DataExporter.exportToCSV(this.transactions);
                     this.uiManager.showNotification('Transactions exported successfully.', 'success');
                 } else {
@@ -258,7 +248,6 @@
                         successCount++;
                     }
                 }
-
                 return successCount;
             }
 
@@ -267,7 +256,6 @@
                 let fixed = 0;
 
                 for (const t of transactions) {
-                    // Find all potential Tech Business transactions
                     const desc = t.description?.toLowerCase() || '';
                     const isTechBusiness = (
                         (t.amount > 10000 && (desc.includes('packer') || desc.includes('thomas'))) ||
@@ -301,13 +289,11 @@
                 for (const t of transactions) {
                     const desc = t.description?.toLowerCase() || '';
 
-                    // Find transfers from 0111 to Lisa's accounts
                     if ((desc.includes('from chk ...0111') &&
                          (desc.includes('to chk ...0898') || desc.includes('to chk ...0005'))) ||
                         ((t.accountId === '0898' || t.accountId === '0005') &&
                          desc.includes('from chk ...0111'))) {
 
-                        // Update to Lisa's Income
                         if (t.category !== 'Personal Income' || t.subcategory !== "Lisa's Income") {
                             await this.dataService.updateTransaction(t.id, {
                                 category: 'Personal Income',
@@ -329,17 +315,10 @@
         }
 
         async function main() {
-            // This is the main entry point for the application.
-            // It follows a structured initialization process to prevent race conditions.
-
-            // Step 1: Initialize Firebase. This is the foundational service.
             const firebaseApp = initializeApp(AppConfig.FIREBASE_CONFIG);
             const auth = getAuth(firebaseApp);
             const firestore = getFirestore(firebaseApp);
 
-            // Step 2: Instantiate core services. These services are the building blocks
-            // of the application's functionality. They are created here so they can be
-            // injected as dependencies into other components that need them.
             const notificationManager = new NotificationManager();
             const authService = new AuthService(auth);
             const firestoreFunctions = {
@@ -350,47 +329,40 @@
             const geminiService = new GeminiService(AppConfig.GEMINI_API_KEY);
             await geminiService.initialize();
 
-            // Step 3: Create the main application controller shell.
             const app = new App();
-            window.app = app; // Make app instance globally available
-            app.dataService = dataService; // Pass dataservice early for integrations
+            window.app = app;
+            app.dataService = dataService;
 
-            // Step 4: Instantiate and initialize the integration layer.
             const categoryIntegration = new CategoryIntegration(app);
             const integrationServices = await categoryIntegration.initialize();
             
-            // Step 5: Instantiate other managers that depend on the integration services.
             const settingsManager = new SettingsManager(geminiService, integrationServices.categoryManager);
             const uiManager = new UIManager({
                 ...integrationServices,
+                dataService,
                 settingsManager,
                 notificationManager,
                 authService
             });
 
-            // Step 6: Fully configure the app controller with all its dependencies.
             app.authService = authService;
             app.geminiService = geminiService;
             app.uiManager = uiManager;
             app.settingsManager = settingsManager;
-            app.categoryIntegration = integrationServices; // Add the integration services to the app
+            app.categoryIntegration = integrationServices;
 
-            // Step 7: Initialize the app's main logic (auth listener, data loading).
             app.init();
 
             document.body.insertAdjacentHTML('beforeend', QuickActions.render());
 
             console.log("Finance Tracker Initialized");
             
-            // Initialize new QuickDebug class
             window.debugUtils = new QuickDebug(app);
             window.recoverTech = () => app.recoverTechBusinessData();
             window.fixLisaIncome = () => app.fixLisaIncomeTransactions();
         }
 
-        // Run the app
         main().catch(console.error);
-
     </script>
 </body>
 </html>
