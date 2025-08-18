@@ -1,5 +1,7 @@
 // js/categorization/CategoryManager.js
 export class CategoryManager {
+    cons// js/categorization/CategoryManager.js
+export class CategoryManager {
     constructor(dataService, appConfig) {
         this.dataService = dataService;
         this.appConfig = appConfig;
@@ -61,7 +63,7 @@ export class CategoryManager {
             // Check for regex pattern match
             if (rule.pattern && descLower.match(rule.pattern)) {
                 match = true;
-            }
+            } 
             // Check for a custom condition function
             else if (rule.condition && rule.condition(transaction)) {
                 if (rule.action) {
@@ -113,14 +115,14 @@ export class CategoryManager {
             return { ...transaction, ...categoryResult };
         });
     }
-
+    
     getDefaultCategories() {
         return [
             { id: 'income_rent', category: 'Real Estate Income', subcategory: 'Rent', entity: 'Real Estate' },
             { id: 'expense_mortgage', category: 'Property Expenses', subcategory: 'Mortgage', entity: 'Real Estate' },
             { id: 'expense_utilities', category: 'Utilities', subcategory: 'Internet/Cable', entity: 'Real Estate' },
             { id: 'income_tech', category: 'Tech Business Income', subcategory: 'Consulting', entity: 'Tech Business' },
-            { id: 'expense__tech', category: 'Tech Business Expense', subcategory: 'Business Expense', entity: 'Tech Business' },
+            { id: 'expense_tech', category: 'Tech Business Expense', subcategory: 'Business Expense', entity: 'Tech Business' },
             { id: 'income_personal', category: 'Personal Income', subcategory: "Lisa's Income", entity: 'Personal' },
             { id: 'expense_health', category: 'Insurance', subcategory: 'Health Insurance', entity: 'Personal' },
             { id: 'expense_hsa', category: 'Healthcare', subcategory: 'HSA Contribution', entity: 'Personal' },
