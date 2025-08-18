@@ -72,6 +72,7 @@
 
         // UI Components
         import { UIManager } from './js/ui/UIManager.js';
+        import { SearchFilter } from './js/ui/SearchFilter.js';
         import { SettingsManager } from './js/settings/SettingsManager.js';
         import { NotificationManager } from './js/ui/NotificationManager.js';
         import { QuickActions } from './js/ui/QuickActions.js';
@@ -132,6 +133,7 @@
                 this.dataService = null;
                 this.geminiService = null;
                 this.uiManager = null;
+                this.searchFilter = null;
                 this.categoryIntegration = null;
                 this.settingsManager = null;
                 this.transactions = [];
@@ -141,6 +143,7 @@
 
             init() {
                 this.uiManager.init(this);
+                this.searchFilter = this.uiManager.searchFilter;
                 this.settingsManager.init(this.uiManager);
 
                 this.authService.onAuthStateChanged(async (user) => {
@@ -152,32 +155,57 @@
                         this.uiManager.showAuth();
                     }
                 });
+
+                this.setupGlobalHandlers();
             }
 
             async loadDataAndRender() {
                 try {
-                    [this.accounts, this.transactions] = await Promise.all([
-                        this.dataService.loadAccounts(),
-                        this.dataService.loadTransactions()
-                    ]);
+                    if (this.transactions.length === 0 || this.accounts.length === 0) {
+                        [this.accounts, this.transactions] = await Promise.all([
+                            this.dataService.loadAccounts(),
+                            this.dataService.loadTransactions()
+                        ]);
+                        console.log(`Loaded ${this.accounts.length} accounts and ${this.transactions.length} transactions.`);
+                    }
                     
-                    console.log(`Loaded ${this.accounts.length} accounts and ${this.transactions.length} transactions.`);
-                    
-                    const transferPairs = TransferMatcher.findTransferPairs(this.transactions);
+                    const filteredTransactions = this.searchFilter.filterTransactions(this.transactions);
+
+                    const transferPairs = TransferMatcher.findTransferPairs(filteredTransactions);
                     if (transferPairs.length > 0) {
                         console.log(`Found ${transferPairs.length} transfer pairs.`);
                     }
 
-                    const analytics = new BusinessAnalytics(this.transactions);
+                    const analytics = new BusinessAnalytics(filteredTransactions);
                     const report = analytics.generateReport();
 
                     this.uiManager.renderDashboard(report);
-                    this.uiManager.renderTransactionList(this.transactions);
+                    await this.uiManager.renderTransactionList(filteredTransactions);
 
                 } catch (error) {
                     console.error("Failed to load data and render:", error);
                     this.uiManager.showNotification("Error loading application data.", "error");
                 }
+            }
+
+            setupGlobalHandlers() {
+                window.search = (term) => {
+                    const searchInput = document.getElementById('search-term');
+                    if (searchInput) {
+                        searchInput.value = term;
+                        searchInput.dispatchEvent(new Event('input'));
+                    }
+                };
+
+                document.addEventListener('keydown', (e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                        e.preventDefault();
+                        const searchInput = document.getElementById('search-term');
+                        if (searchInput) {
+                            searchInput.focus();
+                        }
+                    }
+                });
             }
 
             async addTransaction(data) {

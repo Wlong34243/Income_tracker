@@ -1,10 +1,10 @@
+// js/categorization/CategoryManager.js
 export class CategoryManager {
     constructor(dataService, appConfig) {
         this.dataService = dataService;
         this.appConfig = appConfig;
         this.categories = [];
-        this.autoTagRules = new Map();
-        // This can be expanded or loaded from config
+        this.rules = [];
         this.tenantPropertyMap = {
             'jack sevilla': '5th ST E',
             'araceli ponce': '5th ST E',
@@ -18,364 +18,93 @@ export class CategoryManager {
             'steven malloy': '1112 36th St W',
             'claribel castillomero': '59th Ave E',
             'belem amaro': '59th Ave E',
-            // Special case - not tied to property
-            'michael katzen': null  // Lisa's income, not property-related
+            'michael katzen': null
         };
     }
 
-    getCategoriesForDropdown() {
-       const grouped = {};
-       this.categories.forEach(cat => {
-           if (!grouped[cat.category]) {
-               grouped[cat.category] = [];
-           }
-           grouped[cat.category].push({
-               id: cat.id || `${cat.category}_${cat.subcategory}`,
-               category: cat.category,
-               subcategory: cat.subcategory,
-               entity: cat.entity
-           });
-       });
-       return grouped;
-    }
-
     async init() {
-        // Try to load from localStorage first
-        const stored = localStorage.getItem('expense_categories');
-        if (stored) {
-            try {
-                this.categories = JSON.parse(stored);
-            } catch (e) {
-                console.error('Failed to parse stored categories:', e);
-            }
-        }
-
-        // If no categories loaded, use defaults
-        if (!this.categories || this.categories.length === 0) {
-            this.categories = this.getDefaultCategories();
-            // Save defaults to localStorage
-            localStorage.setItem('expense_categories', JSON.stringify(this.categories));
-        }
-
-        this.buildAutoTagRules();
-        console.log(`CategoryManager initialized with ${this.categories.length} categories`);
+        this.categories = this.getDefaultCategories();
+        this.rules = this.buildRules();
+        console.log(`CategoryManager initialized with ${this.rules.length} rules.`);
     }
 
-    // This is the new, prioritized categorization flow
-    categorizeTransaction(transaction) {
-        // Safety check
-        if (!transaction || !transaction.description) {
-            return {
-                category: 'Uncategorized',
-                subcategory: null,
-                entity: 'Unknown',
-                property: null,
-                confidence: 0.0,
-                method: 'no_description'
-            };
-        }
+    buildRules() {
+        // Higher priority rules (lower number) are checked first
+        return [
+            // High Priority Keywords & Specific Payments
+            { pattern: /schwab brokerage.*moneylink/i, category: 'Investment', subcategory: 'Transfer to Schwab', entity: 'Investment', priority: 1 },
+            { pattern: /zelle payment to lisa/i, category: 'Personal Income', subcategory: "Lisa's Income", entity: 'Personal', priority: 1 },
+            { pattern: /irs.*usataxpymt/i, category: 'Taxes', subcategory: 'Federal Income Tax', entity: 'Personal', priority: 1 },
+            { pattern: /chase credit crd.*autopay/i, category: 'CC Payment', subcategory: 'Chase Card', entity: 'Transfer', priority: 1 },
+            { pattern: /rocket|mortgage|shellpoint/i, category: 'Property Expenses', subcategory: 'Mortgage', entity: 'Real Estate', priority: 2 },
+            { pattern: /vyve|frontier/i, category: 'Utilities', subcategory: 'Internet/Cable', entity: 'Real Estate', priority: 2 },
 
+            // Transfers
+            { pattern: /online transfer (to|from) (CHK|SAV|.*\d{4})/i, category: 'Transfer', subcategory: 'Internal', entity: 'Transfer', priority: 3 },
+            { pattern: /transfer (to|from).*(8529|0111|7991|8895|119)/i, category: 'Transfer', subcategory: 'Internal', entity: 'Transfer', priority: 3 },
+
+            // Account-based Rules (lower priority)
+            { condition: (t) => t.accountId === '0111' && t.amount > 0, action: (t) => this.categorizeRent(t), priority: 4 },
+            { condition: (t) => t.accountId === '8529' && t.amount < 0, category: 'Property Expenses', subcategory: 'Operating', entity: 'Real Estate', priority: 5 },
+            { condition: (t) => t.accountId === '7991' && t.amount > 0, category: 'Tech Business Income', subcategory: 'Consulting', entity: 'Tech Business', priority: 5 },
+            { condition: (t) => t.accountId === '2299' && t.amount < 0, category: 'Tech Business Expense', subcategory: 'Business Expense', entity: 'Tech Business', priority: 5 },
+            { condition: (t) => t.accountId === '7588', category: 'Personal Expense', subcategory: 'Shared Expense', entity: 'Personal', priority: 5 },
+            { condition: (t) => t.accountId === '2433' && t.amount < 0, category: 'Personal Expense', subcategory: 'Credit Card', entity: 'Personal', priority: 5 },
+        ].sort((a, b) => a.priority - b.priority);
+    }
+
+    categorizeTransaction(transaction) {
         const descLower = transaction.description.toLowerCase();
 
-        // PRIORITY 0: Detect Tech Business by multiple patterns
-        if ((transaction.amount > 10000 &&
-             (descLower.includes('packer') ||
-              descLower.includes('thomas') ||
-              descLower.includes('packerthomas'))) ||
-            (transaction.accountId === '7991' && transaction.amount > 5000) ||
-            (descLower.includes('audit') && transaction.amount > 1000)) {
+        for (const rule of this.rules) {
+            let match = false;
+            // Check for regex pattern match
+            if (rule.pattern && descLower.match(rule.pattern)) {
+                match = true;
+            }
+            // Check for a custom condition function
+            else if (rule.condition && rule.condition(transaction)) {
+                if (rule.action) {
+                    return rule.action(transaction); // Action handles returning the category itself
+                }
+                match = true;
+            }
 
-            console.log('Detected Tech Business income:', transaction.description, transaction.amount);
-            return {
-                category: 'Tech Business Income',
-                subcategory: 'Consulting',
-                entity: 'Tech Business',
-                property: null,
-                confidence: 0.98,
-                method: 'tech_business_pattern'
-            };
-        }
-
-        // PRIORITY 1: Lisa's Income Detection
-        // Transfers from 0111 to Lisa's accounts (0898 or 0005)
-        if (transaction.accountId === '0111' || descLower.includes('from chk ...0111')) {
-            // Check if it's going to Lisa's accounts
-            if (descLower.includes('to chk ...0898') ||
-                descLower.includes('to chk ...0005') ||
-                descLower.includes('transfer to chk ...0898') ||
-                descLower.includes('transfer to chk ...0005')) {
-
-                console.log('Detected Lisa\'s income transfer:', transaction.description);
+            if (match) {
                 return {
-                    category: 'Personal Income',
-                    subcategory: 'Lisa\'s Income',
-                    entity: 'Personal',
-                    property: null,
-                    confidence: 0.99,
-                    method: 'lisa_transfer_rule'
+                    category: rule.category,
+                    subcategory: rule.subcategory,
+                    entity: rule.entity,
+                    confidence: 1.0 - (rule.priority * 0.1), // Confidence based on priority
+                    method: `rule_p${rule.priority}`
                 };
             }
         }
 
-        // Also check the reverse - money coming INTO 0898 or 0005 from 0111
-        if ((transaction.accountId === '0898' || transaction.accountId === '0005') &&
-            transaction.amount > 0) {
-            if (descLower.includes('from chk ...0111') ||
-                descLower.includes('transfer from chk ...0111')) {
-
-                return {
-                    category: 'Personal Income',
-                    subcategory: 'Lisa\'s Income',
-                    entity: 'Personal',
-                    property: null,
-                    confidence: 0.99,
-                    method: 'lisa_account_rule'
-                };
-            }
-        }
-
-        // 1. ACCOUNT-SPECIFIC RULES (HIGHEST PRIORITY)
-        const accountMatch = this.categorizeByAccount(transaction);
-        if (accountMatch) return accountMatch;
-
-        // 2. RENT DETECTION
-        const rentMatch = this.findRent(transaction);
-        if (rentMatch) return rentMatch;
-
-        // 3. TRANSFER DETECTION
-        const transferMatch = this.findTransfer(transaction);
-        if (transferMatch) return transferMatch;
-
-        // 4. AMOUNT MATCH
-        const amountMatch = this.findAmountMatch(transaction);
-        if (amountMatch) return { ...amountMatch, confidence: 0.95, method: 'amount_match' };
-
-        // 5. KEYWORD MATCH
-        const keywordMatch = this.findKeywordMatch(transaction);
-        if (keywordMatch) return { ...keywordMatch, confidence: 0.85, method: 'keyword_match' };
-
-        // 6. DEFAULT
-        return this.getDefaultCategory(transaction);
+        // Fallback if no rules match
+        return { category: 'Uncategorized', subcategory: 'Uncategorized', entity: 'Unknown', confidence: 0.0, method: 'no_match' };
     }
 
-    categorizeByAccount(transaction) {
-        const { accountId, amount, description } = transaction;
-        const descLower = description.toLowerCase();
-
-        switch(accountId) {
-            case '0111': // Sweep Account - ALL deposits are rent
-                if (amount > 0) {
-                    return {
-                        category: 'Real Estate Income',
-                        subcategory: 'Rent',
-                        entity: 'Real Estate',
-                        confidence: 0.95,
-                        method: 'account_rule_0111'
-                    };
-                }
-                break;
-
-            case '8529': // Real Estate Operations
-                if (descLower.includes('rocket') || descLower.includes('mortgage')) {
-                    return {
-                        category: 'Property Expenses',
-                        subcategory: 'Mortgage',
-                        entity: 'Real Estate',
-                        confidence: 0.95,
-                        method: 'account_rule_8529'
-                    };
-                }
-                if (descLower.includes('vyve') || descLower.includes('frontier')) {
-                    return {
-                        category: 'Utilities',
-                        subcategory: 'Internet/Cable',
-                        entity: 'Real Estate',
-                        confidence: 0.90,
-                        method: 'account_rule_8529'
-                    };
-                }
-                break;
-
-            case '7991': // Tech Business Income
-                if (amount > 0) {
-                    return {
-                        category: 'Tech Business Income',
-                        subcategory: 'Consulting',
-                        entity: 'Tech Business',
-                        confidence: 0.90,
-                        method: 'account_rule_7991'
-                    };
-                }
-                break;
-
-            case '7588': // Shared Checking
-                if (Math.abs(amount - (-1367)) < 10) {
-                    return {
-                        category: 'Insurance',
-                        subcategory: 'Health Insurance',
-                        entity: 'Personal',
-                        confidence: 0.95,
-                        method: 'account_rule_7588_amount'
-                    };
-                }
-                if (Math.abs(amount - (-750)) < 10) {
-                    return {
-                        category: 'Healthcare',
-                        subcategory: 'HSA Contribution',
-                        entity: 'Personal',
-                        confidence: 0.95,
-                        method: 'account_rule_7588_amount'
-                    };
-                }
-                break;
-        }
-
-        return null; // No account-specific match
+    categorizeRent(transaction) {
+        const tenant = this.identifyTenant(transaction.description);
+        return {
+            category: 'Real Estate Income',
+            subcategory: 'Rent',
+            entity: 'Real Estate',
+            property: tenant ? this.tenantPropertyMap[tenant] : 'Unknown Property',
+            confidence: 0.9,
+            method: 'rent_categorization_rule'
+        };
     }
 
-    // New rent detection logic
-    findRent(transaction) {
-        const { accountId, amount, description } = transaction;
-        const descLower = description.toLowerCase();
-
-        // Rule 1: Zelle payment over $500 in account 0111
-        if (accountId === '0111' && amount > 0 && descLower.includes('zelle') && amount >= 500) {
-            return {
-                category: 'Real Estate Income',
-                subcategory: 'Rent',
-                entity: 'Real Estate',
-                property: this.identifyProperty(description),
-                confidence: 0.90,
-                method: 'rent_zelle_rule'
-            };
-        }
-
-        // Rule 2: Known tenant names
-        const tenantNames = Object.keys(this.tenantPropertyMap);
-        const foundTenant = tenantNames.find(name => descLower.includes(name));
-        if (foundTenant) {
-            return {
-                category: 'Real Estate Income',
-                subcategory: 'Rent',
-                entity: 'Real Estate',
-                property: this.identifyProperty(description),
-                confidence: 0.95,
-                method: 'rent_tenant_name_match'
-            };
-        }
-
-        return null;
-    }
-
-    // New transfer detection logic
-    findTransfer(transaction) {
-        const { description } = transaction;
-        // Only mark as transfer if it explicitly says "transfer" with account numbers/types
-        if (description.match(/transfer (to|from) (CHK|SAV|.*\d{4})/i)) {
-            return {
-                category: 'Transfer',
-                subcategory: 'Internal',
-                entity: 'Transfer',
-                confidence: 0.90,
-                method: 'transfer_regex_match'
-            };
-        }
-        return null;
-    }
-
-    identifyProperty(description) {
+    identifyTenant(description) {
         const descLower = description.toLowerCase();
         for (const name in this.tenantPropertyMap) {
             if (descLower.includes(name)) {
-                return this.tenantPropertyMap[name];
+                return name;
             }
         }
-        return 'Unknown Property';
-    }
-
-    // --- Existing methods (some will be updated/removed in later steps) ---
-
-    // This is the old keyword list that will be cleaned up
-    getDefaultCategories() {
-        return [
-             // Income Categories
-            {
-                id: 'income_rent', category: 'Income', subcategory: 'Rent Received', entity: 'Real Estate',
-                autoTagKeywords: ['rent', 'rental income', 'sevilla', 'johnson', 'smith'], // Removed 'monthly rent'
-            },
-            {
-                id: 'income_tech', category: 'Income', subcategory: 'Tech Audit Fees', entity: 'Tech Business',
-                autoTagKeywords: ['packerthomas', 'consulting', 'audit', 'professional services'],
-            },
-            {
-                id: 'income_investment', category: 'Income', subcategory: 'Investment Income', entity: 'Personal',
-                autoTagKeywords: ['dividend', 'interest', 'capital gains', 'schwab'],
-            },
-            // Utilities
-            {
-                id: 'utilities_electric', category: 'Utilities', subcategory: 'Electric', entity: 'Real Estate',
-                autoTagKeywords: ['electric', 'electricity', 'power', 'pge', 'duke energy'],
-            },
-            {
-                id: 'utilities_internet', category: 'Utilities', subcategory: 'Internet/Cable', entity: 'Real Estate',
-                autoTagKeywords: ['vyve', 'frontier', 'internet', 'cable', 'wifi', 'comcast', 'spectrum'],
-            },
-            // Transfers - REMOVED GENERIC KEYWORDS
-            {
-                id: 'transfer_internal', category: 'Transfers', subcategory: 'Internal_Transfer', entity: 'All',
-                autoTagKeywords: ['internal'], // Only 'internal' is specific enough
-            },
-            {
-                id: 'transfer_credit_payment', category: 'Transfers', subcategory: 'Credit_Payment', entity: 'All',
-                autoTagKeywords: ['credit card payment', 'visa payment'], // Removed 'payment'
-            }
-            // ... other categories remain the same for now
-        ];
-    }
-
-    // Other methods like findAmountMatch, findKeywordMatch, etc. remain for now
-    // but their priority in the main categorization flow has changed.
-
-    // --- Boilerplate methods (unchanged) ---
-    async loadCategories() {
-        // Implementation was missing - add it
-        const stored = localStorage.getItem('expense_categories');
-        if (stored) {
-            this.categories = JSON.parse(stored);
-        } else {
-            this.categories = this.getDefaultCategories();
-        }
-    }
-    buildAutoTagRules() {
-        if (!this.categories) return;
-        // ... existing implementation
-    }
-    findAmountMatch(transaction) {
-        // ... (implementation is unchanged)
-    }
-    findKeywordMatch(transaction) {
-        // ... (implementation is unchanged)
-    }
-    findAccountMatch(transaction) {
-        // ... (implementation is unchanged)
-    }
-    getDefaultCategory(transaction) {
-        // ... (implementation is unchanged)
-    }
-    // ... and so on for all other existing methods
-    learnFromCorrection(transaction, newCategory) {
-       const rule = {
-           pattern: transaction.description.toLowerCase(),
-           category: newCategory.category,
-           subcategory: newCategory.subcategory,
-           entity: newCategory.entity,
-           confidence: 0.9
-       };
-
-       // Save to localStorage for persistence
-       const customRules = JSON.parse(localStorage.getItem('learned_rules') || '[]');
-       customRules.push(rule);
-       localStorage.setItem('learned_rules', JSON.stringify(customRules));
+        return null;
     }
 
     async categorizeAll(transactions) {
@@ -383,5 +112,38 @@ export class CategoryManager {
             const categoryResult = this.categorizeTransaction(transaction);
             return { ...transaction, ...categoryResult };
         });
+    }
+
+    getDefaultCategories() {
+        return [
+            { id: 'income_rent', category: 'Real Estate Income', subcategory: 'Rent', entity: 'Real Estate' },
+            { id: 'expense_mortgage', category: 'Property Expenses', subcategory: 'Mortgage', entity: 'Real Estate' },
+            { id: 'expense_utilities', category: 'Utilities', subcategory: 'Internet/Cable', entity: 'Real Estate' },
+            { id: 'income_tech', category: 'Tech Business Income', subcategory: 'Consulting', entity: 'Tech Business' },
+            { id: 'expense__tech', category: 'Tech Business Expense', subcategory: 'Business Expense', entity: 'Tech Business' },
+            { id: 'income_personal', category: 'Personal Income', subcategory: "Lisa's Income", entity: 'Personal' },
+            { id: 'expense_health', category: 'Insurance', subcategory: 'Health Insurance', entity: 'Personal' },
+            { id: 'expense_hsa', category: 'Healthcare', subcategory: 'HSA Contribution', entity: 'Personal' },
+            { id: 'transfer_internal', category: 'Transfer', subcategory: 'Internal', entity: 'Transfer' },
+            { id: 'cc_payment', category: 'CC Payment', subcategory: 'Chase Card', entity: 'Transfer' },
+            { id: 'taxes_federal', category: 'Taxes', subcategory: 'Federal Income Tax', entity: 'Personal' },
+            { id: 'investment_transfer', category: 'Investment', subcategory: 'Transfer to Schwab', entity: 'Investment' }
+        ];
+    }
+
+    getCategoriesForDropdown() {
+        const grouped = {};
+        this.categories.forEach(cat => {
+            if (!grouped[cat.category]) {
+                grouped[cat.category] = [];
+            }
+            grouped[cat.category].push({
+                id: cat.id || `${cat.category}_${cat.subcategory}`,
+                category: cat.category,
+                subcategory: cat.subcategory,
+                entity: cat.entity
+            });
+        });
+        return grouped;
     }
 }

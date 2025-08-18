@@ -7,7 +7,6 @@ import { SearchFilter } from './SearchFilter.js';
 export class UIManager {
     constructor(services) {
         this.services = services;
-        this.searchFilter = new SearchFilter(services.dataService);
         this.app = null;
 
         this.elements = {
@@ -26,6 +25,9 @@ export class UIManager {
         this.monthlyDashboard = new MonthlyDashboard(services.dataService, services.categoryManager);
         this.recurringTemplates = new RecurringTemplates(services.dataService);
         this.rentTracker = new RentTracker(services.dataService, services.categoryManager);
+
+        // Initialize search filter if available
+        this.initSearchFilter();
     }
 
     init(appController) {
@@ -357,26 +359,52 @@ export class UIManager {
         this.showNotification(`Rent Collection: ${status.collectionRate}%`, 'info');
     }
 
-    async renderTransactionList(transactions) {
-        // Render search bar first
-        const searchContainer = document.createElement('div');
-        await this.searchFilter.renderSearchBar(searchContainer, this.app.transactions, this.app.accounts);
+    async initSearchFilter() {
+        try {
+            // Dynamically import to avoid breaking if not present
+            const { SearchFilter } = await import('./SearchFilter.js');
+            this.searchFilter = new SearchFilter(this.services.dataService);
+            console.log('✅ SearchFilter initialized');
 
-        const listContainer = document.createElement('div');
-        if (!transactions || transactions.length === 0) {
-            listContainer.innerHTML = `<div class="bg-white p-4 rounded-lg shadow text-center">No transactions match the current filters.</div>`;
-        } else {
-            const rows = transactions.map(t => this.createTransactionRow(t)).join('');
-            listContainer.innerHTML = `
-                <div class="bg-white p-4 rounded-lg shadow">
-                    <h2 class="text-xl font-bold mb-2">Recent Transactions (${transactions.length})</h2>
-                    <div class="space-y-1">${rows}</div>
-                </div>`;
+            // Auto-inject into page if container exists
+            if (typeof document !== 'undefined') {
+                const container = document.getElementById('search-container');
+                if (container) {
+                    this.searchFilter.renderSearchBar(container);
+                }
+            }
+        } catch (error) {
+            console.log('SearchFilter not available yet');
+        }
+    }
+
+    renderTransactionList(transactions) {
+        const container = document.getElementById('transactions-container');
+        if (!container) return;
+
+        // Add search container if it doesn't exist
+        if (!document.getElementById('search-container')) {
+            const searchDiv = document.createElement('div');
+            searchDiv.id = 'search-container';
+            searchDiv.className = 'mb-4';
+            container.parentNode.insertBefore(searchDiv, container);
+
+            // Initialize search if available
+            if (this.searchFilter) {
+                this.searchFilter.renderSearchBar(searchDiv, this.app.transactions, this.app.accounts);
+            }
         }
 
-        this.elements.transactionsContainer.innerHTML = '';
-        this.elements.transactionsContainer.appendChild(searchContainer);
-        this.elements.transactionsContainer.appendChild(listContainer);
+        if (!transactions || transactions.length === 0) {
+            this.elements.transactionsContainer.innerHTML = `<div class="bg-white p-4 rounded-lg shadow text-center">No transactions yet.</div>`;
+            return;
+        }
+        const rows = transactions.map(t => this.createTransactionRow(t)).join('');
+        this.elements.transactionsContainer.innerHTML = `
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h2 class="text-xl font-bold mb-2">Recent Transactions</h2>
+                <div class="space-y-1">${rows}</div>
+            </div>`;
     }
 
     createTransactionRow(transaction) {
