@@ -2,10 +2,12 @@ import { sanitizeHTML } from '../utils/Sanitizer.js';
 import { MonthlyDashboard } from './MonthlyDashboard.js';
 import { RecurringTemplates } from '../data/RecurringTemplates.js';
 import { RentTracker } from '../analytics/RentTracker.js';
+import { SearchFilter } from './SearchFilter.js';
 
 export class UIManager {
     constructor(services) {
         this.services = services;
+        this.searchFilter = new SearchFilter(services.dataService);
         this.app = null;
 
         this.elements = {
@@ -355,17 +357,26 @@ export class UIManager {
         this.showNotification(`Rent Collection: ${status.collectionRate}%`, 'info');
     }
 
-    renderTransactionList(transactions) {
+    async renderTransactionList(transactions) {
+        // Render search bar first
+        const searchContainer = document.createElement('div');
+        await this.searchFilter.renderSearchBar(searchContainer, this.app.transactions, this.app.accounts);
+
+        const listContainer = document.createElement('div');
         if (!transactions || transactions.length === 0) {
-            this.elements.transactionsContainer.innerHTML = `<div class="bg-white p-4 rounded-lg shadow text-center">No transactions yet.</div>`;
-            return;
+            listContainer.innerHTML = `<div class="bg-white p-4 rounded-lg shadow text-center">No transactions match the current filters.</div>`;
+        } else {
+            const rows = transactions.map(t => this.createTransactionRow(t)).join('');
+            listContainer.innerHTML = `
+                <div class="bg-white p-4 rounded-lg shadow">
+                    <h2 class="text-xl font-bold mb-2">Recent Transactions (${transactions.length})</h2>
+                    <div class="space-y-1">${rows}</div>
+                </div>`;
         }
-        const rows = transactions.map(t => this.createTransactionRow(t)).join('');
-        this.elements.transactionsContainer.innerHTML = `
-            <div class="bg-white p-4 rounded-lg shadow">
-                <h2 class="text-xl font-bold mb-2">Recent Transactions</h2>
-                <div class="space-y-1">${rows}</div>
-            </div>`;
+
+        this.elements.transactionsContainer.innerHTML = '';
+        this.elements.transactionsContainer.appendChild(searchContainer);
+        this.elements.transactionsContainer.appendChild(listContainer);
     }
 
     createTransactionRow(transaction) {
